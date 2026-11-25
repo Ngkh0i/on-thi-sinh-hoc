@@ -749,3 +749,9 @@ input { accent-color: var(--accent); }
  .foundation-options li{margin:0;line-height:1.27}
  .foundation-options li:before{content:none}
 }
+
+.foundation-steps li > strong::after {content:" · ";font-weight:400}
+.foundation-data {max-width:100%;overflow-x:auto;margin:.5em 0}
+.foundation-data table {width:100%;font-variant-numeric:tabular-nums}
+@media (max-width:42rem) {.foundation-data th,.foundation-data td {padding:.32em;overflow-wrap:anywhere}}
+@media print {.foundation-data {overflow:visible;break-inside:avoid}.foundation-data table {margin:.25em 0}}
