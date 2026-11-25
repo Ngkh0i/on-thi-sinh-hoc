@@ -343,3 +343,148 @@
 
   document.querySelectorAll("form[data-study]").forEach(setupStudyForm);
 })();
+
+
+(() => {
+  const panel = document.getElementById("reading-notes");
+  if (!panel) return;
+  const dialog = document.getElementById("term-dialog");
+  const shortcut = document.querySelector("[data-note-open]");
+  const wide = matchMedia("(min-width: 70rem)");
+  const position = document.createComment("Ghi chú khi đọc");
+  panel.before(position);
+  const cards = new Map([...panel.querySelectorAll(".term-card")].map(card => [card.dataset.key, card]));
+  const select = panel.querySelector("[data-term-select]");
+  const nearby = panel.querySelector(".term-neighbors");
+  const close = dialog.querySelector("[data-term-close]");
+  const contexts = [...document.querySelectorAll(".chapter-reading [data-reading-keys]")];
+  if (!cards.size || !contexts.length || !dialog.showModal) return;
+
+  const announce = document.createElement("span");
+  announce.className = "reading-announcement";
+  announce.setAttribute("role", "status");
+  announce.setAttribute("aria-live", "polite");
+  panel.append(announce);
+  const back = document.createElement("button");
+  back.className = "back-to-term";
+  back.type = "button";
+  back.textContent = "Về từ vừa chọn";
+  back.hidden = true;
+  let lastLink;
+  back.addEventListener("click", () => lastLink?.focus());
+  panel.append(back);
+  let current, picked, returnTo, pending = false;
+  function show(key) {
+    if (!cards.has(key)) return;
+    for (const [id, card] of cards) card.hidden = id !== key;
+    picked = select.value = key;
+    nearby.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.key === key)));
+  }
+  function setContext(node) {
+    if (!node || current === node) return;
+    current = node;
+    nearby.replaceChildren();
+    const keys = node.dataset.readingKeys.split(/\s+/).filter(key => cards.has(key));
+    for (const key of keys.slice(0, 4)) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.dataset.key = key;
+      b.textContent = cards.get(key).querySelector("h3").textContent;
+      nearby.append(b);
+    }
+    if (keys.length) show(keys[0]);
+    const unit = node.closest(".chapter-subsection");
+    const jump = panel.querySelector(".reading-note-return");
+    jump.hidden = !unit;
+    if (unit) jump.href = "#" + unit.id + "-chot";
+  }
+  function contextAtScreen() {
+    const edge = Math.min(innerHeight * .34, 235);
+    let active = contexts[0];
+    for (const context of contexts) {
+      if (context.getBoundingClientRect().top > edge) break;
+      active = context;
+    }
+    return active;
+  }
+  function open(key, trigger) {
+    if (!wide.matches) {
+      returnTo = trigger;
+      if (!dialog.open) {
+        dialog.append(panel);
+        dialog.showModal();
+        close.focus({preventScroll: true});
+      }
+    }
+    show(key);
+    if (wide.matches) {
+      panel.scrollTop = 0;
+      if (trigger?.classList.contains("term-link")) {
+        const bottom = cards.get(key).querySelector(".term-example").getBoundingClientRect().bottom;
+        const needed = bottom - innerHeight + 20;
+        const available = Math.min(panel.getBoundingClientRect().top - 16, trigger.getBoundingClientRect().top - 72);
+        if (needed > 0 && available > 0) window.scrollBy(0, Math.min(needed, available));
+      }
+    }
+  }
+  function backToReading() {
+    position.after(panel);
+    if (returnTo?.isConnected) returnTo.focus({preventScroll:true});
+    returnTo = null;
+  }
+  panel.querySelector(".term-controls").hidden = false;
+  panel.append(nearby);
+  const jump = document.createElement("a");
+  jump.className = "reading-note-return";
+  jump.textContent = "Xem ý chốt của tiểu mục";
+  jump.hidden = true;
+  panel.append(jump);
+  document.documentElement.classList.add("term-notes-ready");
+  shortcut.hidden = wide.matches;
+  select.addEventListener("change", () => show(select.value));
+  nearby.addEventListener("click", e => {
+    const b = e.target.closest("button[data-key]");
+    if (b) show(b.dataset.key);
+  });
+  document.addEventListener("click", e => {
+    const a = e.target.closest(".term-link");
+    if (!a || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0 || !cards.has(a.dataset.term)) return;
+    e.preventDefault();
+    const block = a.closest("[data-reading-keys]") ||
+      a.closest(".chapter-subsection")?.querySelector(".reading-leadin");
+    if (block) setContext(block);
+    open(a.dataset.term, a);
+    lastLink = a;
+    back.hidden = !wide.matches;
+    const card = cards.get(a.dataset.term);
+    if (wide.matches && e.detail === 0) card.focus({preventScroll:true});
+    if (wide.matches && e.detail !== 0) announce.textContent = card.querySelector("h3").textContent + ". " + card.querySelector("p").textContent;
+  });
+  shortcut.addEventListener("click", () => { setContext(contextAtScreen()); open(picked, shortcut); });
+  close.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", backToReading);
+  dialog.addEventListener("click", e => {
+    if (e.target === dialog) {
+      const r = dialog.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dialog.close();
+    }
+  });
+  panel.addEventListener("click", e => {
+    if (dialog.open && e.target.closest("a[href]")) {returnTo = null; dialog.close();}
+  });
+  wide.addEventListener("change", () => {
+    shortcut.hidden = wide.matches;
+    back.hidden = !wide.matches || !lastLink;
+    if (wide.matches && dialog.open) dialog.close();
+  });
+  function refresh() {
+    pending = false;
+    if (!dialog.open) setContext(contextAtScreen());
+  }
+  window.addEventListener("scroll", () => {
+    if (!pending) { pending = true; requestAnimationFrame(refresh); }
+  }, {passive:true});
+  refresh();
+  const target = document.getElementById(location.hash.slice(1));
+  if (target?.classList.contains("term-card")) open(target.dataset.key, shortcut);
+})();
