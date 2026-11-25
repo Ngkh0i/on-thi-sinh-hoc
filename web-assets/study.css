@@ -721,3 +721,31 @@ input { accent-color: var(--accent); }
 @media print {.review-overview,.review-dialog,.mini-practice,.review-actions,.essay-practice-button{display:none!important}.mini-print h5,.reserve-print h5{break-after:avoid}.mini-print,.reserve-print{margin:.3rem 0;}.mini-options{font-size:.94em}.mini-print p{margin-block:.15rem .35rem;}}
 
 .exam-answer-detail{padding:.45rem 0;border-bottom:1px solid #d8bfab}.exam-answer-detail summary{cursor:pointer}
+
+/* Foundation examples and subsection review in the genetics chapters */
+.genetics-opening,.genetics-bridge {margin:1rem 0;padding:1rem 1.15rem;border:1px solid var(--line);border-inline-start:3px solid var(--accent);border-radius:.3rem}
+.genetics-opening h3,.genetics-bridge h4 {margin:0}
+.genetics-opening p,.genetics-bridge p,.foundation-steps li {max-width:70ch}
+.genetics-bridge .intuition-label,.genetics-bridge .foundation-trap {margin-block:.45rem}
+.genetics-bridge details,.genetics-theory {margin:.7rem 0}
+.genetics-bridge summary,.genetics-theory summary {cursor:pointer;color:var(--accent);font-weight:600}
+.genetics-theory {border-block:1px solid var(--line);padding-block:.65rem}
+.foundation-table {margin:.7rem 0;padding:0}
+.foundation-table figcaption {font-weight:500;margin-bottom:.4rem}
+.foundation-table table {width:100%;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.foundation-steps {padding-inline-start:1.4rem}
+.foundation-steps li {padding-inline-start:.25rem;margin-bottom:.38rem}
+.foundation-steps li::marker {font-weight:700;color:var(--accent)}
+.genetics-path {columns:2;column-gap:2rem;padding-inline-start:1.4rem}
+.genetics-path li {break-inside:avoid;padding-bottom:.35rem}
+.foundation-options {display:grid;grid-template-columns:1fr 1fr;gap:.14em 1em;list-style:none;padding:0;margin:.2em 0 .55em}
+.mini-practice button:disabled {cursor:default;opacity:.62}
+@media (max-width:42rem){.genetics-path{columns:1}.genetics-opening,.genetics-bridge{padding:.75rem}.foundation-table table{font-size:.9em}}
+@media print {
+ .genetics-opening,.genetics-bridge{margin:.45em 0;padding:.5em .7em;border-radius:0;break-inside:auto}
+ .genetics-opening h3,.genetics-bridge h4,.foundation-table figcaption{break-after:avoid}
+ .foundation-table,.foundation-print-question,.foundation-steps li{break-inside:avoid}
+ .foundation-steps,.genetics-bridge p,.genetics-opening p{margin-block:.28em}
+ .foundation-options li{margin:0;line-height:1.27}
+ .foundation-options li:before{content:none}
+}

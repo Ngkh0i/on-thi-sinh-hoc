@@ -99,6 +99,15 @@
     units.get(i.part).push(i);
   }
   const panel=document.querySelector("[data-review-stats]"), notice=document.querySelector(".review-status");
+  function pathState(list){
+    const signature=list.map(i=>i.id).join(".");
+    const state=read(data.page,"mini-path:"+list[0].part);
+    return state.signature===signature ? state : {};
+  }
+  function dueItem(i){
+    const record=read(data.page,i.id);
+    return record.tries && record.due<=Date.now();
+  }
   function refresh(){
     stats(panel,totals(data.page,types));
     const exam=document.querySelector('[data-run="exam"]');
@@ -124,7 +133,16 @@
       const records=set.map(i=>read(data.page,i.id));
       const short=(units.get(text.dataset.miniStatus)||[]).filter(i=>i.type==="recall");
       const written=short.filter(i=>read(data.page,i.id).selfDate).length;
-      text.textContent=records.filter(r=>r.tries).length+"/"+set.length+" đã chấm · "+records.filter(r=>(r.streak||0)>=2).length+" nhớ sau 24 giờ · "+written+"/"+short.length+" câu tự nhớ đã đối chiếu";
+      const progress=records.filter(r=>r.tries).length+"/"+set.length+" đã chấm · "+records.filter(r=>(r.streak||0)>=2).length+" nhớ sau 24 giờ";
+      const area=text.closest("[data-mini-unit]");
+      const start=area.querySelector("[data-path-mini]");
+      if(start){
+        const state=pathState(set), pos=state.at||0;
+        start.textContent=pos===set.length?"Làm lại 13 câu":pos>0?"Tiếp tục từ câu "+(pos+1)+"/13":"Làm 13 câu";
+        const due=set.filter(dueItem).length, retry=area.querySelector("[data-retry-mini]");
+        retry.disabled=!due;
+        text.textContent=progress+" · "+due+" câu sai, phân vân hoặc đến hẹn";
+      }else text.textContent=progress+" · "+written+"/"+short.length+" câu tự nhớ đã đối chiếu";
     }
   }
   function recordMC(item,choice,unsure,independent){
@@ -171,8 +189,16 @@
   }
   function begin(list,mode,cap=5) {
     if(!list.length){notice.textContent="Chưa có câu cần ôn ở mục này. Bạn có thể chọn “Luyện 5 câu” để học tiếp.";return;}
-    queue=(mode==="exam"||mode==="history")?list.slice():mix(list).sort((a,b)=>priority(a)-priority(b)).slice(0,cap);
+    queue=["exam","history","path"].includes(mode)?list.slice():mix(list).sort((a,b)=>priority(a)-priority(b)).slice(0,cap);
     at=0;misses=[];rightCount=0;sessionType=mode;
+    if(mode==="path"){
+      const saved=pathState(list);
+      if(saved.at>0 && saved.at<list.length){
+        at=saved.at;rightCount=saved.rightCount||0;
+        misses=list.filter(i=>(saved.misses||[]).includes(i.id));
+      }
+      savePath(at);
+    }
     if(!dialog){
       previousFocus=document.activeElement;
       dialog=el("dialog","review-dialog");dialog.setAttribute("aria-labelledby","practice-title");
@@ -205,6 +231,13 @@
     }
     container.append(block);
   }
+  function savePath(position){
+    if(sessionType!=="path")return;
+    change("mini-path:"+queue[0].part,state=>{
+      state.signature=queue.map(i=>i.id).join(".");
+      state.at=position;state.rightCount=rightCount;state.misses=misses.map(i=>i.id);
+    });
+  }
   function next(){at++;display();}
   function display(){
     if(sessionType==="exam"){examQuestion();return;}
@@ -217,6 +250,7 @@
     }
     const item=queue[at], written=!isTest(item.type);
     const main=shell(written?(item.type==="recall"?"Tự nhớ kiến thức":"Tự luận và đối chiếu"):"Luyện trắc nghiệm",data.title+" · "+(at+1)+"/"+queue.length);
+    if(sessionType==="path")main.append(el("p","meta",at<10?"Tự kiểm kiến thức · câu "+(at+1)+" trong 10 câu":"Nối kiến thức · câu "+(at-9)+" trong 3 câu"));
     scene(main,item);
     const question=el("p","practice-question",item.q);main.append(question);
     if(written)writeAnswer(main,item);else chooseAnswer(main,item);
@@ -295,6 +329,7 @@
       const r=recordMC(item,value,unsure,true);
       fs.disabled=true;uncertain.disabled=true;grade.disabled=true;
       if(right&&!unsure)rightCount++;else misses.push(item);
+      savePath(at+1);
       feedback.replaceChildren(el("strong","",right?(unsure?"Đúng, còn phân vân":"Đúng"):"Chưa đúng"),
         el("p","","Đáp án: "+item.options[item.answer]),el("p","practice-prose",item.why),
         el("p","meta",(!right||unsure)?"Câu này đã vào danh sách cần ôn.":"Lần ôn tiếp theo: "+dateText(r.due)+"."));
@@ -333,11 +368,18 @@
     main.append(input,el("p","meta","Bản nháp được lưu khi gõ. Bài mẫu mở sau khi bạn viết câu trả lời."),reveal,feedback);
   }
   document.addEventListener("click",event=>{
-    const button=event.target.closest("[data-run],[data-start-mini],[data-start-recall],[data-write-item],[data-repeat-group]");
+    const button=event.target.closest("[data-run],[data-path-mini],[data-retry-mini],[data-start-mini],[data-start-recall],[data-write-item],[data-repeat-group]");
     if(!button)return;
     notice.textContent="";
     if(button.dataset.run==="exam"){launchExam();return;}
     if(button.dataset.repeatGroup){const group=document.getElementById(button.dataset.repeatGroup);const set=[...group.querySelectorAll("fieldset[id]")].map(f=>byAnchor.get(f.id)).filter(Boolean);begin(set,"mc",set.length);return;}
+    if(button.dataset.pathMini || button.dataset.retryMini){
+      const unit=button.dataset.pathMini || button.dataset.retryMini;
+      const group=(units.get(unit)||[]).filter(i=>i.type==="mini");
+      if(button.dataset.pathMini)begin(group,"path",group.length);
+      else {const due=group.filter(dueItem);begin(due,"mc",due.length);}
+      return;
+    }
     if(button.dataset.startMini){const list=(units.get(button.dataset.startMini)||[]).filter(i=>i.type==="mini");begin(list,"mc",list.length);return;}
     if(button.dataset.startRecall){begin((units.get(button.dataset.startRecall)||[]).filter(i=>i.type==="recall"),"written",3);return;}
     if(button.dataset.writeItem){const id=button.dataset.writeItem;begin(items.filter(i=>i.id===id),"written",1);return;}
@@ -351,6 +393,33 @@
     const button=action("Viết và tự chấm theo từng ý",()=>{const r=read(data.page,item.id);if(field.value.trim()&&!r.draft&&!r.selfDate)change(item.id,z=>{z.draft=field.value;});begin([item],"written",1);});
     button.classList.add("essay-practice-button");field.after(button);
   }
+  function revealTheoryAnchor(){
+    const anchor=document.getElementById(location.hash.slice(1));
+    const fold=anchor?.closest("details.genetics-theory");
+    if(fold && !fold.open){fold.open=true;anchor.scrollIntoView();}
+  }
+  function priorDrafts(){
+    for(const [unit,entries] of Object.entries(data.priorRecall||{})){
+      const section=document.getElementById(unit+"-trac-nghiem");
+      if(!section)continue;
+      const block=el("details","genetics-theory");
+      block.append(el("summary","","Bài tự viết đã lưu từ phiên bản trước"));
+      for(const [id,prompt] of entries){
+        const old=read(data.page,id);
+        if(!old.draft && !old.revision && !old.history?.length)continue;
+        block.append(el("h5","",prompt));
+        for(const answer of old.history||[]){
+          block.append(el("p","meta",dateText(answer.at)),el("p","practice-prose",answer.text));
+          if(answer.revision)block.append(el("p","practice-prose",answer.revision));
+        }
+        if(old.draft)block.append(el("p","practice-prose",old.draft));
+        if(old.revision)block.append(el("p","practice-prose",old.revision));
+      }
+      if(block.children.length>1)section.append(block);
+    }
+  }
+  priorDrafts();
+  window.addEventListener("hashchange",revealTheoryAnchor);revealTheoryAnchor();
   window.addEventListener("storage",refresh);window.addEventListener("pageshow",refresh);refresh();
   if(new URLSearchParams(location.search).get("on")==="den-hen")document.querySelector('[data-run="due"]')?.click();
 })();
