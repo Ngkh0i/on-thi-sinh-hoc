@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 580 264" role="img" aria-label="Hai chuỗi ba hình của nấm men. Nảy chồi tạo phần lồi bên hông lớn dần. Phân đôi tạo vách giữa tế bào hình que rồi tách đôi.">
+<title>Nảy chồi và phân đôi dưới kính hiển vi</title>
+<g fill="#39291f" font-family="Arial,sans-serif" font-size="18"><text x="12" y="25" font-weight="700">Nảy chồi</text><text x="12" y="157" font-weight="700">Phân đôi</text></g>
+<g fill="#f5d6bd" stroke="#824322" stroke-width="3"><ellipse cx="66" cy="70" rx="27" ry="21"/><ellipse cx="245" cy="70" rx="27" ry="21"/><circle cx="272" cy="61" r="10"/><ellipse cx="433" cy="70" rx="27" ry="21"/><ellipse cx="501" cy="65" rx="19" ry="15"/>
+<rect x="31" y="181" width="68" height="29" rx="14.5"/><rect x="211" y="181" width="94" height="29" rx="14.5"/><rect x="392" y="181" width="48" height="29" rx="14.5"/><rect x="457" y="181" width="48" height="29" rx="14.5"/></g>
+<g fill="none" stroke="#824322" stroke-width="3" stroke-linecap="round"><path d="M135 68h30l-7-5m7 5l-7 5 M328 68h30l-7-5m7 5l-7 5 M135 196h30l-7-5m7 5l-7 5 M328 196h30l-7-5m7 5l-7 5 M258 182v27"/></g>
+<g fill="#39291f" text-anchor="middle" font-family="Arial,sans-serif" font-size="16"><text x="67" y="109">Tế bào mẹ</text><text x="251" y="109">Chồi mọc lệch</text><text x="465" y="109">Mẹ và con tách ra</text><text x="65" y="240">Tế bào que</text><text x="257" y="240">Vách ngang ở giữa</text><text x="455" y="240">Hai con xấp xỉ nhau</text></g>
+<path d="M12 130h556" stroke="#cfae97" fill="none"/></svg>
