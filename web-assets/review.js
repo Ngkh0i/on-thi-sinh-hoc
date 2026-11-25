@@ -1,0 +1,356 @@
+(() => {
+  "use strict";
+  const packetNode = document.getElementById("review-packet");
+  const catalogNode = document.getElementById("review-catalog");
+  if (!packetNode && !catalogNode) return;
+  const data = JSON.parse((packetNode || catalogNode).textContent);
+  const DAY = 86400000;
+  const memory = new Map();
+  let persistent = true;
+  const unsaved=new Set();
+  function key(page,id) { return "on-thi:kiem-tra:1:"+data.course+":"+page+":"+id; }
+  function read(page,id) {
+    const k=key(page,id);
+    try {
+      const raw=localStorage.getItem(k);
+      if (!unsaved.has(k) && raw) return JSON.parse(raw);
+    } catch { persistent=false; }
+    return memory.get(k) || {};
+  }
+  function change(id,fn) {
+    const k=key(data.page,id), value=read(data.page,id);
+    fn(value);
+    memory.set(k,value);
+    try { localStorage.setItem(k,JSON.stringify(value));unsaved.delete(k); }
+    catch { persistent=false;unsaved.add(k); }
+    return value;
+  }
+  function el(tag,cls,text) {
+    const node=document.createElement(tag);
+    if (cls) node.className=cls;
+    if (text!=null) node.textContent=text;
+    return node;
+  }
+  function action(label,run,primary=false) {
+    const b=el("button","button"+(primary?"":" secondary"),label);
+    b.type="button"; b.addEventListener("click",run); return b;
+  }
+  function dateText(ts) {
+    return new Intl.DateTimeFormat("vi-VN",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(ts);
+  }
+  function mix(list) {
+    const copy=list.slice();
+    for(let i=copy.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [copy[i],copy[j]]=[copy[j],copy[i]]; }
+    return copy;
+  }
+  function isTest(t) {return t==="mc" || t==="mini";}
+  function totals(page,types) {
+    const t={n:0,done:0,secure:0,due:0,essays:0,written:0,writtenDue:0,feedback:0,next:Infinity};
+    for(const [id,type] of Object.entries(types)) {
+      const r=read(page,id);
+      if(isTest(type)) {
+        t.n++; if(r.tries)t.done++; if((r.streak||0)>=2)t.secure++;
+        if(r.seen)t.feedback++;
+        if(r.tries && r.due<=Date.now())t.due++;
+        if(r.due>Date.now())t.next=Math.min(t.next,r.due);
+      } else if(type==="essay") {
+        t.essays++; if(r.selfDate){t.written++;if(r.due<=Date.now())t.writtenDue++;}
+      }
+    }
+    return t;
+  }
+  function meter(title,value,total) {
+    const wrap=el("div","review-meter"), label=el("div","review-meter-title");
+    label.append(el("span","",title),el("strong","",value+" / "+total));
+    const bar=el("progress"); bar.max=Math.max(total,1); bar.value=value;
+    bar.setAttribute("aria-label",title); wrap.append(label,bar); return wrap;
+  }
+  function stats(box,t) {
+    const meters=el("div","review-meters");
+    meters.append(meter("Trắc nghiệm đã chấm",t.done,t.n),meter("Nhớ lại đúng sau ít nhất 24 giờ",t.secure,t.n));
+    box.replaceChildren(meters,el("p","review-summary",t.due+" câu cần ôn · Đã đối chiếu lời giải "+t.feedback+" câu · Tự luận đã tự chấm "+t.written+"/"+t.essays+" ("+t.writtenDue+" đến hẹn)."));
+    if(!persistent)box.append(el("p","review-storage","Trình duyệt chưa cho lưu tiến độ. Lượt này chỉ giữ trong trang đang mở."));
+  }
+  if(catalogNode) {
+    const box=document.querySelector("[data-course-stats]"), list=document.querySelector("[data-review-list]");
+    function drawCatalog(){
+      const sum={n:0,done:0,secure:0,due:0,essays:0,written:0,writtenDue:0,feedback:0};
+      list.replaceChildren();
+      for(const page of data.pages) {
+        const t=totals(page.page,page.types);
+        Object.keys(sum).forEach(k=>sum[k]+=t[k]);
+        const row=el("article","review-index-row"), a=el("a","",page.title);
+        a.href=page.url;
+        row.append(a,el("p","meta",t.done+"/"+t.n+" trắc nghiệm đã chấm · "+t.secure+" nhớ qua hai lượt · "+t.due+" cần ôn · "+t.written+"/"+t.essays+" tự luận"));
+        if(t.due){const due=el("a","","Ôn "+t.due+" câu đến hẹn");due.href=page.url.replace("#on-lai","?on=den-hen#on-lai");row.append(due);}
+        list.append(row);
+      }
+      stats(box,sum);
+    }
+    drawCatalog(); window.addEventListener("pageshow",drawCatalog);window.addEventListener("storage",drawCatalog);
+    return;
+  }
+  const items=data.items, types=Object.fromEntries(items.map(i=>[i.id,i.type]));
+  const byAnchor=new Map(items.filter(i=>i.anchor).map(i=>[i.anchor,i]));
+  const units=new Map();
+  for(const i of items) {
+    if(!i.part)continue;
+    if(!units.has(i.part))units.set(i.part,[]);
+    units.get(i.part).push(i);
+  }
+  const panel=document.querySelector("[data-review-stats]"), notice=document.querySelector(".review-status");
+  function refresh(){
+    stats(panel,totals(data.page,types));
+    const exam=document.querySelector('[data-run="exam"]');
+    if(exam){
+      const saved=read(data.page,"exam-session");
+      const chosen=Object.values(saved.answers||{}).filter(a=>Number.isInteger(a.choice)).length;
+      if(chosen && !saved.finished)exam.textContent="Tiếp tục thi thử ("+chosen+"/30)";
+      else exam.textContent="Thi lại 30 câu";
+      if(saved.lastDate)panel.append(el("p","meta","Lần thi thử gần nhất: "+saved.lastScore+"/30 · "+dateText(saved.lastDate)));
+      if(saved.history?.length){
+        const prior=el("details","exam-history");prior.append(el("summary","","Xem lại các lượt thi đã nộp"));
+        for(const h of [...saved.history].reverse()){
+          const label=dateText(h.at)+" · "+h.score+"/30";
+          const questions=items.filter(i=>i.type==="mc");
+          if(questions.every(i=>h.answers[i.id]))prior.append(action(label,()=>{begin(questions,"history",questions.length);examResults(h.answers,h.score);}));
+          else prior.append(el("p","meta",label+" · Từ bản đề trước"));
+        }
+        panel.append(prior);
+      }
+    }
+    for(const text of document.querySelectorAll("[data-mini-status]")) {
+      const set=(units.get(text.dataset.miniStatus)||[]).filter(i=>i.type==="mini");
+      const records=set.map(i=>read(data.page,i.id));
+      const short=(units.get(text.dataset.miniStatus)||[]).filter(i=>i.type==="recall");
+      const written=short.filter(i=>read(data.page,i.id).selfDate).length;
+      text.textContent=records.filter(r=>r.tries).length+"/"+set.length+" đã chấm · "+records.filter(r=>(r.streak||0)>=2).length+" nhớ sau 24 giờ · "+written+"/"+short.length+" câu tự nhớ đã đối chiếu";
+    }
+  }
+  function recordMC(item,choice,unsure,independent){
+    return change(item.id,r=>{
+      const now=Date.now(), right=choice===item.answer;
+      if(!independent&&r.lastBook===choice)return;
+      if(!independent)r.lastBook=choice;
+      r.tries=(r.tries||0)+1; r.last=now; r.right=right; r.unsure=unsure;
+      if(!right || unsure){
+        r.streak=0;r.credit=0;r.due=now;
+      } else if(independent){
+        if(!r.credit || now-r.credit>=DAY) {
+          r.streak=(r.streak||0)+1;r.credit=now;
+          r.due=now+(r.streak===1?1:r.streak===2?3:7)*DAY;
+        }
+      } else if(!r.credit) {r.due=now+DAY;}
+    });
+  }
+  // A saved radio choice is a draft. Only a completed grading action counts as an attempt.
+  document.addEventListener("click",e=>{
+    const b=e.target.closest("[data-grade-group],[data-grade]"); if(!b)return;
+    const scope=b.closest("[data-grade-group]")?b.closest(".bank-group"):b.closest("form");
+    if(!scope)return;
+    const fields=[...scope.querySelectorAll("fieldset[data-correct]")];
+    if(!fields.length||fields.some(f=>!f.querySelector("input:checked")))return;
+    for(const f of fields) {
+      const item=byAnchor.get(f.id);
+      if(item)recordMC(item,Number(f.querySelector("input:checked").value),false,false);
+    }
+    refresh();
+  });
+  document.addEventListener("toggle",e=>{
+    const detail=e.target;
+    if(!detail.open || !detail.matches?.("details.bank-key,details.mock-key"))return;
+    // Reviewing a whole answer sheet is available without claiming individual mastery.
+    notice.textContent="Bạn có thể mở lượt ôn mới để thử trả lời khi chưa nhìn đáp án.";
+  },true);
+  let dialog,previousFocus,queue=[],at=0,misses=[],rightCount=0,sessionType="";
+  function priority(item){
+    const r=read(data.page,item.id);
+    if(r.tries && r.due<=Date.now())return r.right===false||r.unsure?0:1;
+    if(!r.tries&&!r.selfDate)return 2;
+    return 3;
+  }
+  function begin(list,mode,cap=5) {
+    if(!list.length){notice.textContent="Chưa có câu cần ôn ở mục này. Bạn có thể chọn “Luyện 5 câu” để học tiếp.";return;}
+    queue=(mode==="exam"||mode==="history")?list.slice():mix(list).sort((a,b)=>priority(a)-priority(b)).slice(0,cap);
+    at=0;misses=[];rightCount=0;sessionType=mode;
+    if(!dialog){
+      previousFocus=document.activeElement;
+      dialog=el("dialog","review-dialog");dialog.setAttribute("aria-labelledby","practice-title");
+      document.body.append(dialog);
+      dialog.addEventListener("close",()=>{dialog.remove();dialog=null;refresh();previousFocus?.focus();});
+      dialog.showModal();
+    }
+    if(mode!=="history")display();
+  }
+  function shell(heading,kicker) {
+    dialog.replaceChildren();
+    const top=el("div","practice-top");top.append(el("span","meta",kicker),action("Đóng",()=>dialog.close()));
+    const h=el("h2","",heading);h.id="practice-title";h.tabIndex=-1;
+    dialog.append(top,h);
+    const main=el("div","practice-body");dialog.append(main);dialog.scrollTop=0;h.focus();return main;
+  }
+  function scene(container,item){
+    if(!item.scene)return;
+    const block=el("div","review-scene"); block.innerHTML=data.scenes[item.scene];
+    // Diagrams may reuse clip paths in the main chapter; give the duplicate its own IDs.
+    const contextIds=new Map();
+    for(const x of block.querySelectorAll("[id]")){contextIds.set(x.id,"review-scene-"+x.id);x.id="review-scene-"+x.id;}
+    for(const x of block.querySelectorAll("*")){
+      for(const a of [...x.attributes]){
+        let value=a.value;
+        if(value.startsWith("#")&&contextIds.has(value.slice(1)))value="#"+contextIds.get(value.slice(1));
+        else value=value.replace(/url\(#([^)]+)\)/g,(match,id)=>contextIds.has(id)?"url(#"+contextIds.get(id)+")":match);
+        if(value!==a.value)x.setAttribute(a.name,value);
+      }
+    }
+    container.append(block);
+  }
+  function next(){at++;display();}
+  function display(){
+    if(sessionType==="exam"){examQuestion();return;}
+    if(at>=queue.length){
+      const main=shell("Kết quả lượt ôn",data.title);
+      main.append(el("p","",sessionType==="written"?"Đã đối chiếu "+queue.length+" bài viết.":"Đúng và chắc "+rightCount+"/"+queue.length+" câu."));
+      if(misses.length)main.append(action("Thử lại "+misses.length+" câu còn vướng",()=>begin(misses.slice(),"mc",misses.length),true));
+      else if(sessionType!=="written")main.append(el("p","meta","Lần nhớ lại đúng sau ít nhất 24 giờ sẽ được ghi riêng trên thanh tiến độ."));
+      main.append(action("Về bài học",()=>dialog.close()));refresh();return;
+    }
+    const item=queue[at], written=!isTest(item.type);
+    const main=shell(written?(item.type==="recall"?"Tự nhớ kiến thức":"Tự luận và đối chiếu"):"Luyện trắc nghiệm",data.title+" · "+(at+1)+"/"+queue.length);
+    scene(main,item);
+    const question=el("p","practice-question",item.q);main.append(question);
+    if(written)writeAnswer(main,item);else chooseAnswer(main,item);
+  }
+  function launchExam(){
+    const paper=items.filter(i=>i.type==="mc");
+    const signature=paper.map(i=>i.id).join(".");
+    const saved=read(data.page,"exam-session");
+    if(saved.signature!==signature || saved.finished){
+      change("exam-session",s=>{s.signature=signature;s.answers={};s.orders={};s.pos=0;s.finished=false;});
+    }
+    begin(paper,"exam",paper.length);
+  }
+  function examQuestion(){
+    const saved=read(data.page,"exam-session");
+    at=Math.max(0,Math.min(queue.length-1,saved.pos||0));
+    const item=queue[at], picked=saved.answers[item.id]||{};
+    const main=shell("Thi thử trắc nghiệm",data.title+" · "+(at+1)+"/"+queue.length);
+    scene(main,item);main.append(el("p","practice-question",item.q));
+    const fs=el("fieldset","review-options");fs.append(el("legend","sr-practice","Chọn một phương án"));
+    const order=saved.orders[item.id]||mix(item.options.map((_,i)=>i));
+    if(!saved.orders[item.id])change("exam-session",s=>{s.orders[item.id]=order;});
+    const updateAnswer=(field,value)=>change("exam-session",s=>{s.answers[item.id]={...(s.answers[item.id]||{}),[field]:value};});
+    order.forEach((n,j)=>{
+      const l=el("label","review-option"),r=el("input");r.type="radio";r.name="exam-answer";r.value=n;
+      r.checked=picked.choice===n;r.addEventListener("change",()=>updateAnswer("choice",n));
+      l.append(r,el("span","","ABCD"[j]+". "+item.options[n]));fs.append(l);
+    });
+    const uncertain=el("input");uncertain.type="checkbox";uncertain.checked=!!picked.unsure;
+    uncertain.addEventListener("change",()=>updateAnswer("unsure",uncertain.checked));
+    const flag=el("label","practice-confidence");flag.append(uncertain,document.createTextNode(" Tôi còn phân vân"));
+    const nav=el("div","review-actions"),status=el("p","meta");status.setAttribute("aria-live","polite");
+    function navigate(pos){change("exam-session",s=>{s.pos=pos;});examQuestion();}
+    if(at>0)nav.append(action("Câu trước",()=>navigate(at-1)));
+    if(at<queue.length-1)nav.append(action("Câu tiếp",()=>navigate(at+1),true));
+    else nav.append(action("Nộp 30 câu và xem kết quả",()=>{
+      const state=read(data.page,"exam-session");
+      const gap=queue.findIndex(i=>!Number.isInteger(state.answers[i.id]?.choice));
+      if(gap!==-1){navigate(gap);dialog.querySelector(".practice-body").prepend(el("p","review-storage","Hãy chọn phương án cho câu còn trống này trước khi nộp."));return;}
+      if(state.finished)return;
+      const now=Date.now(),correct=queue.filter(i=>state.answers[i.id].choice===i.answer).length;
+      change("exam-session",s=>{s.finished=true;s.lastScore=correct;s.lastDate=now;s.history=[...(s.history||[]),{at:now,score:correct,answers:{...s.answers}}].slice(-5);});
+      for(const i of queue){const a=state.answers[i.id];recordMC(i,a.choice,!!a.unsure,true);}
+      examResults(state.answers,correct);
+    },true));
+    const answered=Object.values(saved.answers).filter(a=>Number.isInteger(a.choice)).length;
+    status.textContent=answered+"/"+queue.length+" câu đã chọn khi mở câu này. Lựa chọn được lưu khi bạn chuyển câu hoặc đóng đề.";
+    main.append(fs,flag,nav,status);
+  }
+  function examResults(answers,correct){
+      const out=shell("Kết quả thi thử",data.title);
+      out.append(el("p","practice-question",correct+"/"+queue.length+" câu đúng."));
+      const missed=queue.filter(i=>answers[i.id].choice!==i.answer || answers[i.id].unsure);
+      if(missed.length)out.append(action("Luyện lại "+missed.length+" câu sai hoặc phân vân",()=>begin(missed,"mc",missed.length),true));
+      queue.forEach((i,index)=>{
+        const a=answers[i.id], d=el("details","exam-answer-detail");
+        d.append(el("summary","","Câu "+(index+1)+" · "+(a.choice===i.answer?"Đúng":"Chưa đúng")+(a.unsure?" · Còn phân vân":"")));
+        scene(d,i);d.append(el("p","practice-question",i.q),el("p","","Bạn chọn: "+i.options[a.choice]),el("p","","Đáp án: "+i.options[i.answer]),el("p","practice-prose",i.why));
+        out.append(d);
+      });
+      out.append(action("Về đề thi",()=>dialog.close()));refresh();
+  }
+  function chooseAnswer(main,item){
+    const fs=el("fieldset","review-options");fs.append(el("legend","sr-practice","Chọn một phương án"));
+    for(const [index,n] of mix(item.options.map((_,i)=>i)).entries()){
+      const label=el("label","review-option");const input=el("input");input.type="radio";input.name="current-answer";input.value=n;
+      label.append(input,el("span","","ABCD"[index]+". "+item.options[n]));fs.append(label);
+    }
+    const confidence=el("label","practice-confidence"), uncertain=el("input");uncertain.type="checkbox";
+    confidence.append(uncertain,document.createTextNode(" Tôi còn phân vân về lựa chọn này"));
+    const feedback=el("div","practice-feedback"); feedback.setAttribute("aria-live","polite");
+    const grade=action("Chấm câu này",()=>{
+      const selected=fs.querySelector("input:checked");
+      if(!selected){feedback.textContent="Hãy chọn một phương án trước khi chấm.";return;}
+      const value=Number(selected.value), right=value===item.answer, unsure=uncertain.checked;
+      const r=recordMC(item,value,unsure,true);
+      fs.disabled=true;uncertain.disabled=true;grade.disabled=true;
+      if(right&&!unsure)rightCount++;else misses.push(item);
+      feedback.replaceChildren(el("strong","",right?(unsure?"Đúng, còn phân vân":"Đúng"):"Chưa đúng"),
+        el("p","","Đáp án: "+item.options[item.answer]),el("p","practice-prose",item.why),
+        el("p","meta",(!right||unsure)?"Câu này đã vào danh sách cần ôn.":"Lần ôn tiếp theo: "+dateText(r.due)+"."));
+      const seen=action("Đã đối chiếu lời giải",()=>{change(item.id,z=>{z.seen=Date.now()});seen.textContent="Đã ghi nhận";seen.disabled=true;refresh();});
+      feedback.append(seen,action(at+1===queue.length?"Xem kết quả":"Câu tiếp theo",next,true));refresh();
+    },true);
+    main.append(fs,confidence,grade,feedback);
+  }
+  function writeAnswer(main,item){
+    let r=read(data.page,item.id);
+    const input=el("textarea","practice-draft");input.rows=5;input.setAttribute("aria-label","Bài viết của bạn");input.value=r.draft||"";
+    const feedback=el("div","practice-feedback");feedback.setAttribute("aria-live","polite");
+    input.addEventListener("input",()=>change(item.id,z=>{z.draft=input.value;}));
+    const reveal=action("Đối chiếu bài viết",()=>{
+      if(!input.value.trim()){feedback.textContent="Hãy viết lập luận của bạn rồi mở bài mẫu.";input.focus();return;}
+      const firstDraft=input.value;
+      reveal.disabled=true;input.readOnly=true;
+      feedback.replaceChildren(el("strong","","Lời giải để đối chiếu"),el("p","practice-prose",item.why));
+      const criteria=item.criteria.length?item.criteria:["Tôi nêu đúng kết luận của bài mẫu.","Tôi giải thích được vì sao kết luận phù hợp với dữ kiện.","Tôi đã kiểm tra điều kiện, giả định hoặc ví dụ còn thiếu."];
+      feedback.append(el("strong","",item.criteria.length?"Đánh dấu từng ý đã có trong bài của bạn":"Tự kiểm lập luận"));
+      const marks=criteria.map((c,j)=>{const l=el("label","self-mark"), box=el("input");box.type="checkbox";box.checked=!!r.pendingMarks?.[j];box.addEventListener("change",()=>change(item.id,z=>{z.pendingMarks={...(z.pendingMarks||{}),[j]:box.checked};}));l.append(box,document.createTextNode(" "+c));feedback.append(l);return box;});
+      const label=el("label","practice-revise","Ghi phần cần sửa hoặc cách giải thích tốt hơn");const revise=el("textarea");revise.rows=3;revise.value=r.revision||"";label.append(revise);feedback.append(label);
+      revise.addEventListener("input",()=>change(item.id,z=>{z.revision=revise.value;}));
+      if(r.history?.length){
+        const past=el("details");past.append(el("summary","","So với lần viết trước"));
+        const last=r.history[r.history.length-1];past.append(el("p","practice-prose",last.text),el("p","practice-prose",last.revision||""),el("p","meta",last.score+"/"+last.total+" ý tự chấm · "+dateText(last.at)));feedback.append(past);
+      }
+      feedback.append(action("Lưu tự chấm và tiếp tục",()=>{
+        const score=marks.filter(m=>m.checked).length, now=Date.now();
+        change(item.id,z=>{z.history=[...(z.history||[]),{text:firstDraft,revision:revise.value,score,total:marks.length,at:now}].slice(-3);
+          z.draft="";z.revision="";z.pendingMarks={};z.selfDate=now;z.tries=(z.tries||0)+1;z.right=score===marks.length;
+          z.due=now+(score===marks.length?3:1)*DAY;});
+        refresh();next();
+      },true));
+    },true);
+    main.append(input,el("p","meta","Bản nháp được lưu khi gõ. Bài mẫu mở sau khi bạn viết câu trả lời."),reveal,feedback);
+  }
+  document.addEventListener("click",event=>{
+    const button=event.target.closest("[data-run],[data-start-mini],[data-start-recall],[data-write-item],[data-repeat-group]");
+    if(!button)return;
+    notice.textContent="";
+    if(button.dataset.run==="exam"){launchExam();return;}
+    if(button.dataset.repeatGroup){const group=document.getElementById(button.dataset.repeatGroup);const set=[...group.querySelectorAll("fieldset[id]")].map(f=>byAnchor.get(f.id)).filter(Boolean);begin(set,"mc",set.length);return;}
+    if(button.dataset.startMini){const list=(units.get(button.dataset.startMini)||[]).filter(i=>i.type==="mini");begin(list,"mc",list.length);return;}
+    if(button.dataset.startRecall){begin((units.get(button.dataset.startRecall)||[]).filter(i=>i.type==="recall"),"written",3);return;}
+    if(button.dataset.writeItem){const id=button.dataset.writeItem;begin(items.filter(i=>i.id===id),"written",1);return;}
+    if(button.dataset.run==="essay-due"){const due=items.filter(i=>{const r=read(data.page,i.id);return i.type==="essay"&&r.selfDate&&r.due<=Date.now();});if(!due.length){notice.textContent="Chưa có bài tự luận đến hẹn.";return;}begin(due,"written",1);return;}
+    if(button.dataset.run==="essay"){begin(items.filter(i=>i.type==="essay"),"written",1);return;}
+    const list=items.filter(i=>isTest(i.type));
+    begin(button.dataset.run==="due"?list.filter(i=>{const r=read(data.page,i.id);return r.tries&&r.due<=Date.now();}):list,"mc");
+  });
+  for(const item of items.filter(i=>i.type==="essay")){
+    const field=document.getElementById(item.anchor);if(!field)continue;
+    const button=action("Viết và tự chấm theo từng ý",()=>{const r=read(data.page,item.id);if(field.value.trim()&&!r.draft&&!r.selfDate)change(item.id,z=>{z.draft=field.value;});begin([item],"written",1);});
+    button.classList.add("essay-practice-button");field.after(button);
+  }
+  window.addEventListener("storage",refresh);window.addEventListener("pageshow",refresh);refresh();
+  if(new URLSearchParams(location.search).get("on")==="den-hen")document.querySelector('[data-run="due"]')?.click();
+})();

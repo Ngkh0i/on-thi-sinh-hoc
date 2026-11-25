@@ -245,10 +245,12 @@
 
     const progress = document.createElement("p");
     progress.className = "meta";
-    form.prepend(progress);
+    const meter=document.createElement("progress"); meter.className="form-meter"; meter.max=Math.max(total,1); meter.setAttribute("aria-label","Trắc nghiệm đã chọn đáp án");
+    form.prepend(progress,meter);
 
     function updateProgress() {
       const selected = fields.filter(field => field.checked);
+      meter.value=selected.length;
       progress.textContent = selected.length + "/" + total + " câu trắc nghiệm đã chọn";
       for (const {label, questions} of groups) {
         const count = questions.filter(item => item.querySelector("input:checked")).length;
@@ -256,7 +258,7 @@
         label.setAttribute("aria-label", "Đã chọn " + count + " trên " + questions.length + " câu");
       }
       for (const box of form.querySelectorAll(".rubric")) {
-        box.querySelector("[data-rubric-score]").textContent = box.querySelectorAll(":checked").length + "/4";
+        box.querySelector("[data-rubric-score]").textContent = box.querySelectorAll(":checked").length + "/" + box.querySelectorAll("[data-criterion]").length;
       }
       return selected;
     }
