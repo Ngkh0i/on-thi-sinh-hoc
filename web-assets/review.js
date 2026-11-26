@@ -110,6 +110,11 @@
   }
   function refresh(){
     stats(panel,totals(data.page,types));
+    const bankButton=document.querySelector("[data-chapter-loop]");
+    if(bankButton){
+      const state=read(data.page,"chapter-loop");
+      bankButton.textContent=state.done?"Ôn lại 80 câu đến khi hết":state.pending?.length?"Tiếp tục ôn 80 câu · lượt "+state.round:"Ôn 80 câu đến khi hết";
+    }
     const exam=document.querySelector('[data-run="exam"]');
     if(exam){
       const saved=read(data.page,"exam-session");
@@ -117,12 +122,13 @@
       if(chosen && !saved.finished)exam.textContent="Tiếp tục thi thử ("+chosen+"/30)";
       else exam.textContent=saved.finished?"Thi lại 30 câu":"Làm đề 30 câu";
       if(saved.lastDate)panel.append(el("p","meta","Lần thi thử gần nhất: "+saved.lastScore+"/30 · "+dateText(saved.lastDate)));
-      if(saved.history?.length){
+      const submitted=saved.history?.length?saved.history:(saved.finished && saved.lastDate?[{at:saved.lastDate,score:saved.lastScore,answers:saved.answers}]:[]);
+      if(submitted.length){
         const prior=el("details","exam-history");prior.append(el("summary","","Xem lại các lượt thi đã nộp"));
-        for(const h of [...saved.history].reverse()){
+        for(const h of [...submitted].reverse()){
           const label=dateText(h.at)+" · "+h.score+"/30";
           const questions=items.filter(i=>i.type==="mc");
-          if(questions.every(i=>h.answers[i.id]))prior.append(action(label,()=>{begin(questions,"history",questions.length);examResults(h.answers,h.score);}));
+          if(questions.every(i=>Number.isInteger(h.answers?.[i.id]?.choice)))prior.append(action(label,()=>{begin(questions,"history",questions.length);examResults(h.answers,h.score,h.at);}));
           else prior.append(el("p","meta",label+" · Từ bản đề trước"));
         }
         panel.append(prior);
@@ -293,17 +299,29 @@
     const question=el("p","practice-question",item.q);main.append(question);
     if(written)writeAnswer(main,item);else {showHint(main,item);chooseAnswer(main,item);}
   }
-  function startLoop(list) {
-    const id = "loop:" + list[0].part;
+  let activeLoop;
+  function startLoop(list, id = "loop:" + list[0].part) {
+    if(!list.length)return;
+    activeLoop=id;
     const ids = list.map(i => i.id), signature = ids.join(".");
     const saved = read(data.page,id);
-    if (saved.signature !== signature || saved.done) {
+    if (id.startsWith("exam-loop:") && saved.signature && !saved.done && saved.signature!==signature) {
+      change(id,s=>{
+        const previous=new Set(s.signature.split("."));
+        const pending=s.pending.filter(k=>ids.includes(k));
+        if(pending[0]!==s.pending[0]){s.choice=null;s.order=null;s.flag=false;}
+        s.pending=pending.concat(ids.filter(k=>!previous.has(k)));
+        s.again=s.again.filter(k=>ids.includes(k));
+        if(!s.pending.length && s.again.length){s.pending=mix(s.again);s.again=[];s.round++;}
+        s.signature=signature;s.done=!s.pending.length;
+      });
+    } else if (saved.signature !== signature || saved.done) {
       change(id,s => Object.assign(s,{signature,round:1,pending:ids,again:[],choice:null,order:null,flag:false,done:false,run:Date.now()}));
     }
     begin(list,"loop",list.length);
   }
   function loopScreen() {
-    const id = "loop:" + queue[0].part, s = read(data.page,id);
+    const id = activeLoop, s = read(data.page,id);
     if (s.done) {
       const main = shell("Đã giải quyết hết "+queue.length+" câu trong buổi này", data.title);
       main.append(el("p","meta","Hoàn thành sau "+s.round+" lượt. Mốc nhớ lại sau 24 giờ được ghi riêng."),action("Về bài học",()=>dialog.close()));
@@ -320,7 +338,7 @@
     flag.onchange=()=>change(id,x=>{if(x.run===s.run && x.round===s.round && x.pending[0]===item.id)x.flag=flag.checked;});
     const feedback=el("div","practice-feedback");feedback.setAttribute("aria-live","polite");
     function reveal(n) {
-      recordMC(item,n,false,true,{loop:s.run+":"+s.round+":"+item.id});
+      recordMC(item,n,false,true,{loop:(id.startsWith("loop:")?"":id+":")+s.run+":"+s.round+":"+item.id});
       window.studyDisplayAnswer(feedback,fs,n,item.answer,item.why);
       explainChoice(feedback,item,n);
       feedback.append(action("Tiếp tục",()=>{
@@ -391,7 +409,6 @@
     function gradeChoice(choice){
       recordMC(item,choice,uncertain.checked,true,{exam:saved.attemptId});
       window.studyDisplayAnswer(feedback,fs,choice,item.answer,item.why);
-      uncertain.disabled=true;
       const state=read(data.page,"exam-session");
       status.textContent=Object.values(state.answers).filter(a=>Number.isInteger(a.choice)).length+"/"+queue.length+" câu đã chọn.";
     }
@@ -403,7 +420,7 @@
     });
     const uncertain=el("input");uncertain.type="checkbox";uncertain.checked=!!picked.unsure;
     uncertain.addEventListener("change",()=>updateAnswer("unsure",uncertain.checked));
-    const flag=el("label","practice-confidence");flag.append(uncertain,document.createTextNode(" Tôi còn phân vân"));
+    const flag=el("label","practice-confidence");flag.append(uncertain,document.createTextNode(" Muốn làm lại sau khi nộp đề"));
     const nav=el("div","review-actions"),status=el("p","meta");status.setAttribute("aria-live","polite");
     function navigate(pos){change("exam-session",s=>{s.pos=pos;});examQuestion();}
     if(at>0)nav.append(action("Câu trước",()=>navigate(at-1)));
@@ -416,21 +433,33 @@
       const now=Date.now(),correct=queue.filter(i=>state.answers[i.id].choice===i.answer).length;
       change("exam-session",s=>{s.finished=true;s.lastScore=correct;s.lastDate=now;s.history=[...(s.history||[]),{at:now,score:correct,answers:{...s.answers}}].slice(-5);});
       for(const i of queue){const a=state.answers[i.id];recordMC(i,a.choice,!!a.unsure,true,{exam:state.attemptId});}
-      examResults(state.answers,correct);
+      examResults(state.answers,correct,now);
     },true));
     const answered=Object.values(saved.answers).filter(a=>Number.isInteger(a.choice)).length;
     status.textContent=answered+"/"+queue.length+" câu đã chọn.";
-    main.append(el("p","meta","Điểm thi dùng lựa chọn đầu tiên của mỗi câu. Nếu còn phân vân, đánh dấu trước khi chọn."),flag,fs,feedback,nav,status);
+    main.append(el("p","meta","Điểm thi dùng lựa chọn đầu tiên của mỗi câu. Bạn có thể đánh dấu để ôn lại cả sau khi xem lời giải."),flag,fs,feedback,nav,status);
     if(Number.isInteger(picked.choice)) gradeChoice(picked.choice);
   }
-  function examResults(answers,correct){
+  function examResults(answers,correct,submitted){
       const out=shell("Kết quả thi thử",data.title);
       out.append(el("p","practice-question",correct+"/"+queue.length+" câu đúng."));
-      const missed=queue.filter(i=>answers[i.id].choice!==i.answer || answers[i.id].unsure);
-      if(missed.length)out.append(action("Luyện lại "+missed.length+" câu sai hoặc phân vân",()=>begin(missed,"mc",missed.length),true));
+      const paper=queue.slice(), loopId="exam-loop:"+submitted, markId="exam-flags:"+submitted;
+      const isMarked=i=>read(data.page,markId)[i.id] ?? !!answers[i.id].unsure;
+      const candidates=()=>paper.filter(i=>answers[i.id].choice!==i.answer || isMarked(i));
+      const practice=action("",()=>startLoop(candidates(),loopId),true);
+      function update(){
+        const count=candidates().length, state=read(data.page,loopId);
+        practice.disabled=!count;
+        practice.textContent=count?((state.pending?.length && !state.done)?"Tiếp tục ôn đến hết":"Ôn đến khi hết")+" · "+count+" câu đã chọn":"Đã đúng hết · có thể đánh dấu câu để ôn thêm";
+      }
+      update();out.append(practice);
       queue.forEach((i,index)=>{
         const a=answers[i.id], d=el("details","exam-answer-detail");
         d.append(el("summary","","Câu "+(index+1)+" · "+(a.choice===i.answer?"Đúng":"Chưa đúng")+(a.unsure?" · Còn phân vân":"")));
+        const flag=el("input");flag.type="checkbox";flag.checked=isMarked(i);
+        flag.onchange=()=>{change(markId,s=>{s[i.id]=flag.checked;});update();};
+        const label=el("label","practice-confidence");label.append(flag,document.createTextNode(" Muốn làm lại câu "+(index+1)));
+        d.append(label);
         scene(d,i);d.append(el("p","practice-question",i.q),el("p","","Bạn chọn: "+i.options[a.choice]),el("p","","Đáp án: "+i.options[i.answer]),el("p","practice-prose",i.why));
         out.append(d);
       });
@@ -541,6 +570,12 @@
       }
       if(block.children.length>1)section.append(block);
     }
+  }
+  const bank=items.filter(i=>i.type==="mc");
+  if(bank.length===80){
+    const button=action("Ôn 80 câu đến khi hết",()=>startLoop(bank,"chapter-loop"),true);
+    button.dataset.chapterLoop="";button.id="on-80-cau";
+    document.querySelector(".review-overview .review-actions").prepend(button);
   }
   priorDrafts();
   window.addEventListener("hashchange",revealTheoryAnchor);revealTheoryAnchor();
