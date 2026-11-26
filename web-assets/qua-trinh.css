@@ -1,0 +1,47 @@
+/* Hoạt động theo bước và lịch ôn cuối kỳ */
+.process-section,.study-calendar,.process-library{margin-block:2rem;scroll-margin-top:5rem}
+.process-section [hidden],.study-calendar [hidden],.process-library [hidden]{display:none!important}
+.process-section h3,.study-calendar h2,.process-library h2{margin-bottom:.65rem}
+.process-player,.process-group,.calendar-day{border:1px solid #ccaa92;border-radius:.55rem;background:#fff8f1;margin:.65rem 0}
+.process-player,.process-group{padding:.75rem 1rem}
+.process-player summary,.process-group summary{cursor:pointer;font-weight:650;color:#723719;line-height:1.45}
+.process-player [data-state]{font-size:.78em;font-weight:500;color:#6a5142;display:inline-block;margin-left:.45em}
+.process-goal{max-width:62ch}
+.process-section .process-frame{display:block;margin:.6rem 0 1rem;padding:.75rem;border:1px solid #d6baa6;border-radius:.35rem;background:#fffaf5;break-inside:avoid}
+.process-frame figcaption{color:#623620;font-size:1.02em;margin-bottom:.5rem}
+.process-frame svg{display:block;width:100%;height:auto;max-width:39rem;margin:auto}
+.process-frame p{line-height:1.55;margin:.55rem 0 0}
+.process-controls,.day-navigation{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap}
+.process-controls span,.day-navigation span,.day-check,.process-library small{font-size:.9em;color:#684e3e}
+.process-controls button,.process-test button,.day-navigation button,.process-repeat,.day-navigation select,.process-library input{font:inherit;color:#743919;border:1px solid #b88f73;background:#fffaf5;border-radius:.32rem;padding:.36em .68em;cursor:pointer;min-height:2.55em}
+.process-test h5,.process-test p{font-size:1em;margin:.7em 0}
+.process-test ul{list-style:none;padding:0;display:grid;gap:.3rem}
+.process-test li{margin:0}
+.process-test button{width:100%;text-align:left}
+.process-test button[aria-pressed=true]{border-color:#86401f;background:#f6e3d2;box-shadow:inset 3px 0 #86401f}
+.process-test [data-feedback]:not(:empty){padding:.7rem;border-left:3px solid #86401f;background:#f8ebdd}
+.process-repeat{font-size:.88em}
+.process-controls button:disabled,.day-navigation button:disabled{opacity:.45;cursor:default}
+.process-section :focus-visible,.study-calendar :focus-visible,.process-library :focus-visible{outline:2px solid #86401f;outline-offset:3px}
+.process-related,.process-library li small{line-height:1.45}
+.process-group ul,.calendar-day ol{padding:0;list-style:none;margin:0}
+.process-group li{border-top:1px solid #e7cebb;padding:.55rem 0}
+.process-group ul{margin:.5rem 0 0}
+.process-group li a,.process-group li small,.calendar-day li div>strong,.calendar-day li small{display:block}
+.process-library input{max-width:100%;width:22rem;cursor:text}
+.study-calendar{max-width:55rem}
+.day-navigation{justify-content:flex-start;margin:.8rem 0}
+.day-navigation label{min-width:0;max-width:100%}
+.day-navigation select{max-width:100%}
+.calendar-day{padding:.9rem 1.1rem;scroll-margin-top:5rem}
+.calendar-day h3{margin:0 0 .7rem}
+.calendar-day li{display:grid;grid-template-columns:7rem 1fr;gap:.7rem;border-top:1px solid #e6cdb9;padding:.7rem 0}
+.calendar-day li time{font-variant-numeric:tabular-nums;font-weight:600}
+.calendar-day li p{margin:.18rem 0}
+.calendar-day li small{color:#705544}
+.day-links{display:flex;gap:.4rem 1rem;flex-wrap:wrap;margin:.4rem 0}
+.day-check{cursor:pointer;display:inline-flex;align-items:center;gap:.4rem}
+.day-check input{accent-color:#86401f;width:1.1em;height:1.1em}
+.day-exam strong{color:#783617}
+@media(max-width:640px){.day-navigation{display:grid;grid-template-columns:2.5rem minmax(0,1fr) 2.5rem}.day-navigation label{font-size:.92em}.day-navigation span{grid-column:1/-1}.calendar-day li{grid-template-columns:1fr;gap:.15rem}.process-player{padding:.6rem}.process-controls{gap:.35rem;font-size:.88em}.process-controls button{padding:.35em}.process-section .process-frame{padding:.4rem}}
+@media print{.process-section{margin:.5rem 0}.process-print{margin:.45rem 0;border-top:.6pt solid #b99c87}.process-print h4,.process-print h5{break-after:avoid;margin:.3rem 0}.process-print p{margin:.2rem 0}.process-frames{display:block}.process-section .process-frame{margin:.25rem 0;padding:.2rem .45rem;display:grid;grid-template-columns:42% 1fr;column-gap:.6rem;align-items:center}.process-frame figcaption{grid-column:1/-1;font-size:9pt;margin:0}.process-frame svg{width:100%;max-height:29mm}.process-frame p{font-size:8.7pt;margin:.1rem 0}.calendar-day{break-inside:avoid;margin:.35rem 0;padding:.4rem .6rem}.calendar-day li{padding:.25rem 0}.study-calendar{max-width:none}}
