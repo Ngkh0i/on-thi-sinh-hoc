@@ -49,3 +49,20 @@
   .progress-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 @media print { .progress-view, [data-subject-progress] { display:none; } }
+
+.loop-shelf { max-width: 73ch; scroll-margin-top: 1rem; }
+.loop-shelf header { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:.4rem 1rem; border-bottom:2px solid var(--accent); }
+.loop-shelf header span,.loop-kind { color:var(--accent); font-weight:650; font-size:.9rem; }
+.saved-loop { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.5rem 1.2rem; border-bottom:1px solid var(--line); padding:.9rem 0; }
+.saved-loop h3 { margin:.25rem 0; }
+.saved-loop .button { white-space:nowrap; }
+.loop-counts { display:flex; flex-wrap:wrap; align-items:baseline; gap:.25rem 1rem; font-variant-numeric:tabular-nums; }
+.loop-shelf [data-saved-loops]>p { margin:.7rem 0; }
+@media(max-width:38rem) {
+ .saved-loop { grid-template-columns:minmax(0,1fr); }
+ .saved-loop .button { justify-self:start; min-height:2.75rem; }
+}
+
+.loop-filters { display:flex; flex-wrap:wrap; gap:.35rem; padding:.8rem 0 .2rem; }
+.loop-filters button { font:inherit; font-size:.9rem; border:1px solid var(--line); border-radius:.3rem; color:var(--ink); background:transparent; padding:.4rem .65rem; cursor:pointer; }
+.loop-filters button[aria-pressed="true"] { border-color:var(--accent); background:var(--tint); color:var(--accent); font-weight:650; }

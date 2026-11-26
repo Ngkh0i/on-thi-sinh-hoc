@@ -439,7 +439,7 @@
     const reason = document.createDocumentFragment();
     if (template) reason.append(template.content.cloneNode(true));
     else for (const node of original.children) {
-      if (node.matches("p:not(.group-study-notes), .quant-solution, .formula-card")) reason.append(node.cloneNode(true));
+      if (node.matches("p:not(.group-study-notes), .quant-solution, .formula-card, .follow-on")) reason.append(node.cloneNode(true));
     }
     let box = field.querySelector(":scope > .answer-feedback");
     if (!box) {

@@ -871,3 +871,9 @@ a.term-link:hover,a.term-link:focus-visible {color:var(--accent);text-decoration
 .term-card[data-key="locus"] .term-nodes,.term-card[data-key="cpg"] .term-nodes {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.25em}
 .term-card[data-key="locus"] .term-nodes>li,.term-card[data-key="cpg"] .term-nodes>li {text-align:center;padding:.22em .1em;border:0;border-top:1px solid var(--line)}
 .term-card[data-key="locus"] .term-nodes>li:nth-child(2),.term-card[data-key="cpg"] .term-nodes>li:nth-child(2) {color:var(--accent);border-top:2px solid var(--accent)}
+
+.follow-on { border-inline-start:2px solid var(--accent); padding:.3rem .85rem; margin-block:.8rem; }
+.follow-on p { margin:.3rem 0; }
+.follow-on summary,.return-to-progress { color:var(--accent); }
+.return-to-progress { display:inline-block; margin-bottom:.6rem; }
+@media print { .follow-on { margin:.25em 0; padding:.15em .6em; } .follow-on p { margin:.12em 0; } }

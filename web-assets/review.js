@@ -300,12 +300,19 @@
     if(written)writeAnswer(main,item);else {showHint(main,item);chooseAnswer(main,item);}
   }
   let activeLoop;
-  function startLoop(list, id = "loop:" + list[0].part) {
+  function startLoop(list, id = "loop:" + list[0].part, initialReasons = {}) {
     if(!list.length)return;
     activeLoop=id;
     const ids = list.map(i => i.id), signature = ids.join(".");
     const saved = read(data.page,id);
-    if (id.startsWith("exam-loop:") && saved.signature && !saved.done && saved.signature!==signature) {
+    if(id.startsWith("exam-loop:") && saved.signature && !saved.done && saved.signature!==signature) {
+      updateExamSelection(id,ids,initialReasons);
+    } else if (saved.signature !== signature || saved.done) {
+      change(id,s => Object.assign(s,{signature,round:1,pending:ids,again:[],choice:null,order:null,flag:false,done:false,run:Date.now(),touched:Date.now(),reasons:{...initialReasons}}));
+    }
+    begin(list,"loop",list.length);
+  }
+  function updateExamSelection(id,ids,initialReasons) {
       change(id,s=>{
         const previous=new Set(s.signature.split("."));
         const pending=s.pending.filter(k=>ids.includes(k));
@@ -313,12 +320,10 @@
         s.pending=pending.concat(ids.filter(k=>!previous.has(k)));
         s.again=s.again.filter(k=>ids.includes(k));
         if(!s.pending.length && s.again.length){s.pending=mix(s.again);s.again=[];s.round++;}
-        s.signature=signature;s.done=!s.pending.length;
+        s.reasons ||= {};
+        for(const k of ids) if(!previous.has(k)) s.reasons[k]=initialReasons[k];
+        s.touched=Date.now();s.signature=ids.join(".");s.done=!s.pending.length;
       });
-    } else if (saved.signature !== signature || saved.done) {
-      change(id,s => Object.assign(s,{signature,round:1,pending:ids,again:[],choice:null,order:null,flag:false,done:false,run:Date.now()}));
-    }
-    begin(list,"loop",list.length);
   }
   function loopScreen() {
     const id = activeLoop, s = read(data.page,id);
@@ -331,20 +336,32 @@
     const remaining=s.pending.length+s.again.length;
     const main=shell("Ôn đến khi hết", "Lượt "+s.round+" · Còn "+remaining+" câu");
     main.append(meter("Đã giải quyết trong buổi",queue.length-remaining,queue.length));
+    const back=el("a","return-to-progress","Lưu và về Tiến độ môn");
+    back.href="../on-lai.html#dang-on";main.append(back);
     scene(main,item); main.append(el("p","practice-question",item.q)); showHint(main,item);
     const fs=el("fieldset","review-options");fs.append(el("legend","sr-practice","Chọn đáp án"));
     const flag=el("input");flag.type="checkbox";flag.checked=s.flag;
     const label=el("label","practice-confidence");label.append(flag,document.createTextNode(" Muốn làm lại ở lượt sau"));
-    flag.onchange=()=>change(id,x=>{if(x.run===s.run && x.round===s.round && x.pending[0]===item.id)x.flag=flag.checked;});
+    function remember(x) {
+      x.reasons ||= {};
+      const old=x.reasons[item.id] || {};
+      x.reasons[item.id]={...old,marked:x.flag};
+      if(Number.isInteger(x.choice)) x.reasons[item.id].wrong=x.choice!==item.answer;
+      x.touched=Date.now();
+    }
+    flag.onchange=()=>change(id,x=>{
+      if(x.run!==s.run || x.round!==s.round || x.pending[0]!==item.id)return;
+      x.flag=flag.checked;remember(x);
+    });
     const feedback=el("div","practice-feedback");feedback.setAttribute("aria-live","polite");
-    function reveal(n) {
-      recordMC(item,n,false,true,{loop:(id.startsWith("loop:")?"":id+":")+s.run+":"+s.round+":"+item.id});
+    function reveal(n,restored=false) {
+      if(!restored || !read(data.page,item.id).tries)recordMC(item,n,false,true,{loop:(id.startsWith("loop:")?"":id+":")+s.run+":"+s.round+":"+item.id});
       window.studyDisplayAnswer(feedback,fs,n,item.answer,item.why);
       explainChoice(feedback,item,n);
       feedback.append(action("Tiếp tục",()=>{
         change(id,x=>{
           if(x.run!==s.run || x.pending[0]!==item.id || x.round!==s.round)return;
-          x.pending.shift();
+          remember(x);x.pending.shift();
           if(n!==item.answer || x.flag)x.again.push(item.id);
           x.flag=false;x.choice=null;x.order=null;
           if(!x.pending.length){
@@ -364,12 +381,12 @@
       choice.onchange=()=>{
         const latest=read(data.page,id);
         if(latest.run!==s.run || latest.round!==s.round || latest.pending[0]!==item.id || Number.isInteger(latest.choice)){loopScreen();return;}
-        change(id,x=>{x.choice=n;});
+        change(id,x=>{x.choice=n;remember(x);});
         reveal(n);refresh();
       };
     });
     main.append(fs,label,feedback);
-    if(Number.isInteger(s.choice))reveal(s.choice);
+    if(Number.isInteger(s.choice))reveal(s.choice,true);
   }
   function showHint(main,item){
     const guide=data.guides?.[item.part];if(!guide)return;
@@ -379,6 +396,11 @@
     main.append(info);
   }
   function explainChoice(box,item,n){
+    if(item.connect){
+      const block=el("div","follow-on"), answer=el("details");
+      answer.append(el("summary","","Đối chiếu lập luận"),el("p","",item.connect.answer));
+      block.append(el("strong","","Thử đổi tình huống"),el("p","",item.connect.prompt),answer);box.append(block);
+    }
     const guide=data.guides?.[item.part];if(!guide || n===item.answer)return;
     const reason=guide.items?.[item.id]?.wrong?.[n];
     box.append(el("p","practice-prose",reason || ("Đối chiếu kiến thức của tiểu mục · "+guide.reason)));
@@ -446,7 +468,11 @@
       const paper=queue.slice(), loopId="exam-loop:"+submitted, markId="exam-flags:"+submitted;
       const isMarked=i=>read(data.page,markId)[i.id] ?? !!answers[i.id].unsure;
       const candidates=()=>paper.filter(i=>answers[i.id].choice!==i.answer || isMarked(i));
-      const practice=action("",()=>startLoop(candidates(),loopId),true);
+      const reasons=set=>Object.fromEntries(set.map(i=>[i.id,{wrong:answers[i.id].choice!==i.answer,marked:isMarked(i)}]));
+      const practice=action("",()=>{
+        const set=candidates();
+        startLoop(set,loopId,reasons(set));
+      },true);
       function update(){
         const count=candidates().length, state=read(data.page,loopId);
         practice.disabled=!count;
@@ -457,7 +483,17 @@
         const a=answers[i.id], d=el("details","exam-answer-detail");
         d.append(el("summary","","Câu "+(index+1)+" · "+(a.choice===i.answer?"Đúng":"Chưa đúng")+(a.unsure?" · Còn phân vân":"")));
         const flag=el("input");flag.type="checkbox";flag.checked=isMarked(i);
-        flag.onchange=()=>{change(markId,s=>{s[i.id]=flag.checked;});update();};
+        flag.onchange=()=>{
+          change(markId,s=>{s[i.id]=flag.checked;});
+          const saved=read(data.page,loopId), picked=candidates();
+          if(saved.signature && !saved.done){
+            updateExamSelection(loopId,picked.map(q=>q.id),reasons(picked));
+            if(picked.includes(i) && saved.round===1 && saved.pending.includes(i.id) &&
+               !(saved.pending[0]===i.id && Number.isInteger(saved.choice)))
+              change(loopId,s=>{s.reasons[i.id]={...s.reasons[i.id],wrong:answers[i.id].choice!==i.answer,marked:flag.checked};});
+          }
+          update();
+        };
         const label=el("label","practice-confidence");label.append(flag,document.createTextNode(" Muốn làm lại câu "+(index+1)));
         d.append(label);
         scene(d,i);d.append(el("p","practice-question",i.q),el("p","","Bạn chọn: "+i.options[a.choice]),el("p","","Đáp án: "+i.options[i.answer]),el("p","practice-prose",i.why));
@@ -577,8 +613,24 @@
     button.dataset.chapterLoop="";button.id="on-80-cau";
     document.querySelector(".review-overview .review-actions").prepend(button);
   }
+  function resumeSavedLoop(id) {
+    const eligible=id==="chapter-loop" && bank.length===80 ? bank :
+      /^exam-loop:\d+$/.test(id) && bank.length===30 ? bank :
+      id?.startsWith("loop:") ? units.get(id.slice(5))?.filter(i=>i.type==="mini") : null;
+    const saved=eligible && read(data.page,id);
+    const byId=new Map((eligible||[]).map(i=>[i.id,i]));
+    const ids=typeof saved?.signature==="string" ? saved.signature.split(".") : [];
+    if(saved && !saved.done && saved.pending?.length && ids.every(k=>byId.has(k)) &&
+       [...saved.pending,...(saved.again||[])].every(k=>ids.includes(k))){
+      activeLoop=id;begin(ids.map(k=>byId.get(k)),"loop",ids.length);return;
+    }
+    notice.textContent="Buổi ôn này đã kết thúc hoặc chưa có trên trình duyệt này.";
+    const back=el("a","","Về Tiến độ môn");back.href="../on-lai.html#dang-on";notice.append(" ",back);
+  }
   priorDrafts();
   window.addEventListener("hashchange",revealTheoryAnchor);revealTheoryAnchor();
   window.addEventListener("storage",refresh);window.addEventListener("pageshow",refresh);refresh();
-  if(new URLSearchParams(location.search).get("on")==="den-hen")document.querySelector('[data-run="due"]')?.click();
+  const request=new URLSearchParams(location.search);
+  if(request.get("on")==="tiep-tuc") resumeSavedLoop(request.get("buoi"));
+  if(request.get("on")==="den-hen")document.querySelector('[data-run="due"]')?.click();
 })();

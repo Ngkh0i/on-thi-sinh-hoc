@@ -85,6 +85,102 @@
     if (r.streak>=2) stats.solid++;
     timing(stats,r,now);
   }
+  const loopLabels={mini:"Tiểu mục",chapter:"Bộ 80 câu",exam:"Đề đã nộp"};
+  const attemptDate=new Intl.DateTimeFormat("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  function resumeUrl(page,id) {
+    return page.url+"?on=tiep-tuc&buoi="+encodeURIComponent(id)+"#on-lai";
+  }
+  function savedLoops(page,prefix,record,snap,exam) {
+    const rows=[];
+    function add(id,type,allowed,answerKeys,unitTitle,submitted) {
+      const s=record(id);
+      if(s.done || !Array.isArray(s.pending) || !s.pending.length || typeof s.signature!=="string")return;
+      const signature=s.signature.split("."), allowedIds=new Set(allowed);
+      const left=new Set([...s.pending,...(s.again||[])]);
+      if(signature.some(q=>!allowedIds.has(q)) || [...left].some(q=>!signature.includes(q)))return;
+      const attempt=submitted && (exam.history||[]).find(h=>h.at===submitted);
+      const paperAnswers=attempt?.answers || (submitted===exam.lastDate && exam.finished ? exam.answers : null);
+      const marks=submitted ? record("exam-flags:"+submitted) : {};
+      let wrong=0,marked=0,unknown=0;
+      for(const q of left){
+        const now=q===s.pending[0], grade=Number(answerKeys?.[allowed.indexOf(q)]);
+        const retry=(s.again||[]).includes(q) || s.round>1;
+        let w=false,m=false,unclear=false;
+        if(retry){
+          const previous=record(q), token=(type==="mini"?"":id+":")+s.run+":";
+          if(previous.lastLoop===token+s.round+":"+q || previous.lastLoop===token+(s.round-1)+":"+q){
+            w=previous.right===false;m=previous.right===true;unclear=w;
+          }else unclear=true;
+        }else if(submitted){
+          const choice=paperAnswers?.[q];
+          w=choice ? choice.choice!==grade : false;
+          m=marks[q] ?? !!choice?.unsure;
+          unclear=!choice;
+        }
+        const known=s.reasons?.[q];
+        if(typeof known?.wrong==="boolean")w=known.wrong;
+        if(typeof known?.marked==="boolean")m=known.marked;
+        if(typeof known?.wrong==="boolean" && typeof known?.marked==="boolean")unclear=false;
+        if(now && Number.isInteger(s.choice)){w=s.choice!==grade;m=!!s.flag;unclear=false;}
+        else if(now && s.flag)m=true;
+        if(w)wrong++;
+        if(m)marked++;
+        if(unclear)unknown++;
+      }
+      rows.push({id,type,page,title:unitTitle||page.title,sub:unitTitle?page.title:submitted?"Nộp lúc "+attemptDate.format(submitted):"",
+        remaining:left.size,total:signature.length,round:s.round||1,wrong,marked,unknown,time:s.touched||s.run||submitted||0});
+    }
+    for(const u of page.units)add("loop:"+u.anchor,"mini",u.questions,u.keys,u.title);
+    if(page.kind==="chapter")add("chapter-loop","chapter",page.mc,page.keys);
+    else for(const k of snap.records.keys()){
+      if(!k.startsWith(prefix+"exam-loop:"))continue;
+      const id=k.slice(prefix.length);
+      if(/^exam-loop:\d{1,14}$/.test(id))add(id,"exam",page.mc,page.keys,"",Number(id.slice(10)));
+    }
+    return rows;
+  }
+  let selectedLoopType="all";
+  function showSaved(rows,readable){
+    const host=root.querySelector("[data-saved-loops]");
+    if(!host)return;
+    const loops=rows.flatMap(row=>row.loops).sort((a,b)=>b.time-a.time);
+    const counter=root.querySelector("[data-loop-count]");
+    counter.textContent=loops.length ? fmt(loops.length)+" buổi" : "";
+    if(!loops.length){
+      const p=el("p",readable?"Chưa có buổi ôn dở trên trình duyệt này. Khi bạn dừng giữa lượt, buổi ôn sẽ xuất hiện ở đây.":"Trình duyệt chưa cho đọc tiến độ đã lưu.");
+      host.replaceChildren(p,anchor("#danh-sach-chuong","Chọn chương hoặc đề thi"));return;
+    }
+    const countsByType=new Map();
+    for(const entry of loops)countsByType.set(entry.type,(countsByType.get(entry.type)||0)+1);
+    if(!countsByType.has(selectedLoopType))selectedLoopType="all";
+    const filterBar=el("div",null,"loop-filters");
+    filterBar.setAttribute("role","group");filterBar.setAttribute("aria-label","Lọc buổi đang ôn");
+    if(countsByType.size>1){
+      for(const [key,label,count] of [["all","Tất cả",loops.length],...Object.entries(loopLabels).map(([key,label])=>[key,label,countsByType.get(key)])]){
+        if(!count)continue;
+        const button=el("button",label+" ("+fmt(count)+")");
+        button.type="button";button.dataset.loopType=key;
+        button.setAttribute("aria-pressed",String(key===selectedLoopType));
+        button.onclick=()=>{selectedLoopType=key;showSaved(rows,readable);host.querySelector('[data-loop-type="'+key+'"]')?.focus();};
+        filterBar.append(button);
+      }
+    }
+    const visible=loops.filter(s=>selectedLoopType==="all" || selectedLoopType===s.type);
+    const cards=visible.map((s,i)=>{
+      const box=el("article",null,"saved-loop");
+      const body=el("div"), meta=el("p",loopLabels[s.type]+" · Lượt "+fmt(s.round),"loop-kind");
+      body.append(meta,el("h3",s.title));
+      if(s.sub)body.append(el("p",s.sub,"meta"));
+      const counts=el("p",null,"loop-counts");
+      counts.append(el("strong","Còn "+fmt(s.remaining)+"/"+fmt(s.total)+" câu"),el("span",fmt(s.wrong)+" sai"),el("span",fmt(s.marked)+" đánh dấu"));
+      body.append(counts);
+      if(s.unknown)body.append(el("p","Bản cũ chưa lưu đủ lý do cho "+fmt(s.unknown)+" câu. Các số sai và đánh dấu ở trên chỉ tính phần xác định được.","meta"));
+      const link=anchor(resumeUrl(s.page,s.id),"Học tiếp",i===0?"button":"button secondary");
+      link.setAttribute("aria-label","Học tiếp · "+s.title+(s.sub?" · "+s.sub:""));
+      box.append(body,link);return box;
+    });
+    host.replaceChildren(...(filterBar.childElementCount?[filterBar]:[]),...cards,el("p","Số còn lại gồm cả câu chưa làm. Một câu vừa sai vừa đánh dấu chỉ tính một lần vào số còn lại.","meta"));
+  }
   function pageState(course, page, snap) {
     const prefix = testKey + course.slug + ":" + page.page + ":";
     const record = id => snap.records.get(prefix+id) || {};
@@ -128,7 +224,8 @@
     stats.unitTotal=units.length;
     recent=Math.max(recent,exam.lastDate || 0);
     const started=!!(stats.done || stats.read || stats.written || stats.essayDrafts || stats.drafts || examChoices || exam.lastDate || units.some(u => u.position || u.round));
-    return {page,stats,units,exam,examChoices,recent,started};
+    const loops=catalog.all ? [] : savedLoops(page,prefix,record,snap,exam);
+    return {page,stats,units,exam,examChoices,recent,started:started || !!loops.length,loops};
   }
   function courseState(course,snap) {
     const rows = course.pages.map(page => pageState(course,page,snap));
@@ -247,7 +344,7 @@
         const controls=el("div",null,"progress-links");
         const resume=position>0 && position<unit.questions.length;
         addLink(controls,page.url+"?reprendre=mini#"+unit.anchor+"-trac-nghiem",resume?"Tiếp từ câu "+(position+1):s.done?"Làm lại":"Làm "+s.total+" câu");
-        if (round) addLink(controls,page.url+"?reprendre=loop#"+unit.anchor+"-trac-nghiem","Tiếp tục ôn đến hết · lượt "+round);
+        if (round) addLink(controls,resumeUrl(page,"loop:"+unit.anchor),"Tiếp tục ôn đến hết · lượt "+round);
         if (s.due) addLink(controls,page.url+"?reprendre=mini-due#"+unit.anchor+"-trac-nghiem","Ôn "+s.due+" câu đến hẹn");
         li.append(detail,controls);ul.append(li);
       });
@@ -263,6 +360,7 @@
     if (catalog.all) courseCards.replaceChildren(...subjects.map(courseCard));
     else {
       const state=subjects[0];
+      showSaved(state.rows,snap.readable);
       suggest(state);
       const opened=new Set([...list.querySelectorAll("details[open]")].map(d=>d.dataset.page));
       const rows=state.rows.filter(r=>(kind.value==="all" || r.page.kind===kind.value) &&
