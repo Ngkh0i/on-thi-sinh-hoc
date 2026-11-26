@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hôm nay học gì · Chu kỳ tế bào</title>
   <link rel="stylesheet" href="style.css">
+  <script src="../web-assets/study.js" defer></script>
 </head>
-<body>
+<body data-study-course="sinh-hoc-te-bao">
   <a class="skip-link" href="#noi-dung">Bỏ qua điều hướng</a>
   <header class="masthead">
     <div class="wrap masthead-inner">
@@ -113,42 +114,42 @@
         <li><strong>Mẫu C.</strong> Theo dõi tế bào nhóm 4C cho thấy chúng đã vào M. Hoạt tính M-Cdk vẫn cao.</li>
       </ul>
 
-      <p class="small">Chọn một đáp án tốt nhất mỗi câu. Ghi dấu những câu bạn còn phân vân.</p>
-      <fieldset class="question">
+      <p class="small">Chọn một đáp án để xem giải thích ngay dưới câu. Bạn có thể thử lại từng câu sau khi tự giải thích được đáp án.</p>
+      <fieldset class="question" data-correct="B" data-extra-code="e2-mau-1">
         <legend><span class="question-number">1.</span> Nhóm có lượng DNA giữa 2C và 4C ở mẫu A chủ yếu đang ở pha nào?</legend>
         <label class="option"><input type="radio" name="q1" value="A"><span>A. G₁</span></label>
         <label class="option"><input type="radio" name="q1" value="B"><span>B. S</span></label>
         <label class="option"><input type="radio" name="q1" value="C"><span>C. G₂</span></label>
         <label class="option"><input type="radio" name="q1" value="D"><span>D. M</span></label>
-      </fieldset>
-      <fieldset class="question">
+      <template data-explanation><p>Lượng DNA tăng dần từ 2C lên 4C khi tế bào sao chép DNA. G₁ điển hình có 2C. G₂ và pha M của tế bào chưa chia có thể cùng có 4C.</p></template></fieldset>
+      <fieldset class="question" data-correct="C" data-extra-code="e2-mau-2">
         <legend><span class="question-number">2.</span> Một tế bào mẫu A đã hoàn tất pha S và hai chromatid chị em vẫn gắn với nhau. Bộ NST và lượng DNA của tế bào là bao nhiêu?</legend>
         <label class="option"><input type="radio" name="q2" value="A"><span>A. 2n, 2C</span></label>
         <label class="option"><input type="radio" name="q2" value="B"><span>B. 4n, 4C</span></label>
         <label class="option"><input type="radio" name="q2" value="C"><span>C. 2n, 4C</span></label>
         <label class="option"><input type="radio" name="q2" value="D"><span>D. n, 4C</span></label>
-      </fieldset>
-      <fieldset class="question">
+      <template data-explanation><p>Sau pha S, mỗi NST có hai chromatid chị em. Lượng DNA tăng gấp đôi trong khi số bộ NST giữ nguyên. Chọn 4n là đã dùng lượng DNA để suy ra số bộ NST.</p></template></fieldset>
+      <fieldset class="question" data-correct="D" data-extra-code="e2-mau-3">
         <legend><span class="question-number">3.</span> Dựa trên lượng DNA và các quan sát ở mẫu B, kết luận nào phù hợp nhất?</legend>
         <label class="option"><input type="radio" name="q3" value="A"><span>A. Phần lớn tế bào 4C ở đầu G₁ sau khi đã phân chia.</span></label>
         <label class="option"><input type="radio" name="q3" value="B"><span>B. Phần lớn tế bào 4C đang bị giữ trước khi vào S.</span></label>
         <label class="option"><input type="radio" name="q3" value="C"><span>C. Phần lớn tế bào 4C đã vào M và đang chờ tách chromatid ở kỳ giữa.</span></label>
         <label class="option"><input type="radio" name="q3" value="D"><span>D. Dữ kiện phù hợp với sự tích lũy ở G₂, trước khi vào M.</span></label>
-      </fieldset>
-      <fieldset class="question">
+      <template data-explanation><p>Lượng DNA 4C cho thấy nhóm này phù hợp với G₂ hoặc M nếu chỉ xét luồng chu kỳ bình thường. Màng nhân còn nguyên, NST chưa cô đặc và hoạt tính M-Cdk thấp cùng ủng hộ cách giải thích phần lớn nhóm 4C ở B vẫn đang ở G₂. Một lần đo chỉ cho thấy sự phân bố tại thời điểm đó.</p></template></fieldset>
+      <fieldset class="question" data-correct="A" data-extra-code="e2-mau-4">
         <legend><span class="question-number">4.</span> Ở mẫu C, việc M-cyclin không bị phân hủy và M-Cdk duy trì hoạt tính cao gây ảnh hưởng trực tiếp nhất đến bước nào?</legend>
         <label class="option"><input type="radio" name="q4" value="A"><span>A. Thoát pha M sau khi tế bào đã vào M.</span></label>
         <label class="option"><input type="radio" name="q4" value="B"><span>B. Bắt đầu nhân đôi DNA ở đầu pha S.</span></label>
         <label class="option"><input type="radio" name="q4" value="C"><span>C. Hoạt hóa M-Cdk để vào pha M.</span></label>
         <label class="option"><input type="radio" name="q4" value="D"><span>D. Giảm hoạt tính Cdk trước khi tế bào bắt đầu pha G₂.</span></label>
-      </fieldset>
-      <fieldset class="question">
+      <template data-explanation><p>Bình thường phân hủy M-cyclin giúp giảm hoạt tính M-Cdk để kết thúc chương trình pha M. Trong mẫu C, M-Cdk vẫn hoạt động mạnh sau khi tế bào đã vào M nên quá trình thoát M bị cản trở.</p></template></fieldset>
+      <fieldset class="question" data-correct="B" data-extra-code="e2-mau-5">
         <legend><span class="question-number">5.</span> Nếu một lần đo khác chỉ cho thấy hai mẫu đều có tỷ lệ 4C cao, quan sát bổ sung nào phân biệt tốt nhất giữa chậm vào M và khó thoát M?</legend>
         <label class="option"><input type="radio" name="q5" value="A"><span>A. Đo lại lượng DNA ở cùng thời điểm.</span></label>
         <label class="option"><input type="radio" name="q5" value="B"><span>B. Theo dõi sự cô đặc NST và biến đổi màng nhân theo thời gian.</span></label>
         <label class="option"><input type="radio" name="q5" value="C"><span>C. Chỉ đếm tổng số tế bào trong mỗi mẫu.</span></label>
         <label class="option"><input type="radio" name="q5" value="D"><span>D. Chỉ so sánh kích thước trung bình của tế bào.</span></label>
-      </fieldset>
+      <template data-explanation><p>Theo dõi được các chuyển tiếp của từng tế bào sẽ hỗ trợ phân biệt chậm xuất hiện dấu hiệu vào M với đã vào M rồi kéo dài hoặc gặp khó khăn trong quá trình thoát M. Lượng DNA, tổng số tế bào và kích thước đơn lẻ cho ít thông tin về chuyển tiếp này.</p></template></fieldset>
 
       <div class="written">
         <h3>Tự luận · 4–6 câu</h3>
@@ -162,7 +163,7 @@
       <h2 id="doi-chieu-title">Đối chiếu và hẹn ôn</h2>
       <p>Chấm cả câu đúng do đoán. Chọn một lỗi cần sửa, ghi lại lý do bằng một câu và thử trả lời lại vào <time datetime="2026-11-24">24/11</time>. Nếu mục đó vẫn còn yếu, xem lại vào <time datetime="2026-11-26">26/11</time> hoặc <time datetime="2026-11-30">30/11</time>.</p>
       <a class="button" href="loi-giai.html" target="_blank" rel="noopener">Mở lời giải và thang chấm <span aria-hidden="true">↗</span></a>
-      <p class="small">Lời giải mở ở tab mới để bạn giữ bài làm đang nhập. Ghi ra giấy hoặc sao chép nếu muốn giữ bài sau khi đóng trang.</p>
+      <p class="small">Trắc nghiệm được lưu trong trình duyệt này. Bạn có thể mở lời giải ở tab mới để đối chiếu bài tự luận đang viết.</p>
     </section>
 
     <footer class="sources">

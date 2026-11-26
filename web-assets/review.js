@@ -115,7 +115,7 @@
       const saved=read(data.page,"exam-session");
       const chosen=Object.values(saved.answers||{}).filter(a=>Number.isInteger(a.choice)).length;
       if(chosen && !saved.finished)exam.textContent="Tiếp tục thi thử ("+chosen+"/30)";
-      else exam.textContent="Thi lại 30 câu";
+      else exam.textContent=saved.finished?"Thi lại 30 câu":"Làm đề 30 câu";
       if(saved.lastDate)panel.append(el("p","meta","Lần thi thử gần nhất: "+saved.lastScore+"/30 · "+dateText(saved.lastDate)));
       if(saved.history?.length){
         const prior=el("details","exam-history");prior.append(el("summary","","Xem lại các lượt thi đã nộp"));
@@ -142,14 +142,39 @@
         const due=set.filter(dueItem).length, retry=area.querySelector("[data-retry-mini]");
         retry.disabled=!due;
         text.textContent=progress+" · "+due+" câu sai, phân vân hoặc đến hẹn";
+        const past=set.map((item,index)=>({item,index,r:records[index]})).filter(({r})=>Number.isInteger(r.lastChoice));
+        if(past.length){
+          let history=area.querySelector(".mini-answer-history");
+          if(!history){history=el("details","mini-answer-history");area.append(history);}
+          const stamp=past.map(({r})=>r.last).join(".");
+          if(history.dataset.stamp!==stamp){
+            history.dataset.stamp=stamp;
+            history.replaceChildren(el("summary","","Xem lại lựa chọn và lời giải · "+past.length+"/"+set.length+" câu"));
+            for(const {item,index,r} of past){
+              const entry=el("details","exam-answer-detail");
+              entry.append(el("summary","","Câu "+(index+1)+" · "+(r.lastChoice===item.answer?"Đúng":"Chưa đúng")));
+              entry.addEventListener("toggle",()=>{
+                if(!entry.open || entry.childElementCount>1)return;
+                scene(entry,item);entry.append(el("p","practice-question",item.q),el("p","","Bạn chọn · "+item.options[r.lastChoice]),
+                  el("p","","Đáp án đúng · "+item.options[item.answer]),el("p","practice-prose",item.why));
+              });
+              history.append(entry);
+            }
+          }
+        }
       }else text.textContent=progress+" · "+written+"/"+short.length+" câu tự nhớ đã đối chiếu";
     }
   }
-  function recordMC(item,choice,unsure,independent){
-    return change(item.id,r=>{
+  function recordMC(item,choice,unsure,independent,context={}){
+    const prior=read(data.page,item.id);
+    if(context.exam && prior.lastExamAttempt===context.exam)return prior;
+    const result=change(item.id,r=>{
       const now=Date.now(), right=choice===item.answer;
-      if(!independent&&r.lastBook===choice)return;
+      const needsRecall=r.right===false || r.unsure;
+      if(!independent && !context.fresh && r.lastBook===choice)return;
+      if(context.exam)r.lastExamAttempt=context.exam;
       if(!independent)r.lastBook=choice;
+      r.lastChoice=choice;r.shown=now;
       r.tries=(r.tries||0)+1; r.last=now; r.right=right; r.unsure=unsure;
       if(!right || unsure){
         r.streak=0;r.credit=0;r.due=now;
@@ -158,10 +183,18 @@
           r.streak=(r.streak||0)+1;r.credit=now;
           r.due=now+(r.streak===1?1:r.streak===2?3:7)*DAY;
         }
-      } else if(!r.credit) {r.due=now+DAY;}
+      } else if(!r.credit) {r.due=needsRecall?now:now+DAY;}
     });
+    window.dispatchEvent(new Event("study:progress"));
+    return result;
   }
-  // A saved radio choice is a draft. Only a completed grading action counts as an attempt.
+  document.addEventListener("study:answered",event=>{
+    const item=byAnchor.get(event.target.id);
+    if(!item)return;
+    recordMC(item,event.detail,false,false,{fresh:true});
+    refresh();
+  });
+  // An explicit group score can also grade legacy drafts saved before instant feedback.
   document.addEventListener("click",e=>{
     const b=e.target.closest("[data-grade-group],[data-grade]"); if(!b)return;
     const scope=b.closest("[data-grade-group]")?b.closest(".bank-group"):b.closest("form");
@@ -260,7 +293,9 @@
     const signature=paper.map(i=>i.id).join(".");
     const saved=read(data.page,"exam-session");
     if(saved.signature!==signature || saved.finished){
-      change("exam-session",s=>{s.signature=signature;s.answers={};s.orders={};s.pos=0;s.finished=false;});
+      change("exam-session",s=>{s.signature=signature;s.answers={};s.orders={};s.pos=0;s.finished=false;s.attemptId=Date.now();});
+    }else if(!saved.attemptId){
+      change("exam-session",s=>{s.attemptId=Date.now();});
     }
     begin(paper,"exam",paper.length);
   }
@@ -274,9 +309,18 @@
     const order=saved.orders[item.id]||mix(item.options.map((_,i)=>i));
     if(!saved.orders[item.id])change("exam-session",s=>{s.orders[item.id]=order;});
     const updateAnswer=(field,value)=>change("exam-session",s=>{s.answers[item.id]={...(s.answers[item.id]||{}),[field]:value};});
+    const feedback=el("div","practice-feedback");feedback.setAttribute("aria-live","polite");
+    function gradeChoice(choice){
+      recordMC(item,choice,uncertain.checked,true,{exam:saved.attemptId});
+      window.studyDisplayAnswer(feedback,fs,choice,item.answer,item.why);
+      uncertain.disabled=true;
+      const state=read(data.page,"exam-session");
+      status.textContent=Object.values(state.answers).filter(a=>Number.isInteger(a.choice)).length+"/"+queue.length+" câu đã chọn.";
+    }
     order.forEach((n,j)=>{
       const l=el("label","review-option"),r=el("input");r.type="radio";r.name="exam-answer";r.value=n;
-      r.checked=picked.choice===n;r.addEventListener("change",()=>updateAnswer("choice",n));
+      r.checked=picked.choice===n;
+      r.addEventListener("change",()=>{updateAnswer("choice",n);gradeChoice(n);refresh();});
       l.append(r,el("span","","ABCD"[j]+". "+item.options[n]));fs.append(l);
     });
     const uncertain=el("input");uncertain.type="checkbox";uncertain.checked=!!picked.unsure;
@@ -293,12 +337,13 @@
       if(state.finished)return;
       const now=Date.now(),correct=queue.filter(i=>state.answers[i.id].choice===i.answer).length;
       change("exam-session",s=>{s.finished=true;s.lastScore=correct;s.lastDate=now;s.history=[...(s.history||[]),{at:now,score:correct,answers:{...s.answers}}].slice(-5);});
-      for(const i of queue){const a=state.answers[i.id];recordMC(i,a.choice,!!a.unsure,true);}
+      for(const i of queue){const a=state.answers[i.id];recordMC(i,a.choice,!!a.unsure,true,{exam:state.attemptId});}
       examResults(state.answers,correct);
     },true));
     const answered=Object.values(saved.answers).filter(a=>Number.isInteger(a.choice)).length;
-    status.textContent=answered+"/"+queue.length+" câu đã chọn khi mở câu này. Lựa chọn được lưu khi bạn chuyển câu hoặc đóng đề.";
-    main.append(fs,flag,nav,status);
+    status.textContent=answered+"/"+queue.length+" câu đã chọn.";
+    main.append(el("p","meta","Điểm thi dùng lựa chọn đầu tiên của mỗi câu. Nếu còn phân vân, đánh dấu trước khi chọn."),flag,fs,feedback,nav,status);
+    if(Number.isInteger(picked.choice)) gradeChoice(picked.choice);
   }
   function examResults(answers,correct){
       const out=shell("Kết quả thi thử",data.title);
@@ -322,21 +367,20 @@
     const confidence=el("label","practice-confidence"), uncertain=el("input");uncertain.type="checkbox";
     confidence.append(uncertain,document.createTextNode(" Tôi còn phân vân về lựa chọn này"));
     const feedback=el("div","practice-feedback"); feedback.setAttribute("aria-live","polite");
-    const grade=action("Chấm câu này",()=>{
+    fs.addEventListener("change",()=>{
+      if(feedback.hasChildNodes())return;
       const selected=fs.querySelector("input:checked");
-      if(!selected){feedback.textContent="Hãy chọn một phương án trước khi chấm.";return;}
       const value=Number(selected.value), right=value===item.answer, unsure=uncertain.checked;
       const r=recordMC(item,value,unsure,true);
-      fs.disabled=true;uncertain.disabled=true;grade.disabled=true;
+      uncertain.disabled=true;
       if(right&&!unsure)rightCount++;else misses.push(item);
       savePath(at+1);
-      feedback.replaceChildren(el("strong","",right?(unsure?"Đúng, còn phân vân":"Đúng"):"Chưa đúng"),
-        el("p","","Đáp án: "+item.options[item.answer]),el("p","practice-prose",item.why),
-        el("p","meta",(!right||unsure)?"Câu này đã vào danh sách cần ôn.":"Lần ôn tiếp theo: "+dateText(r.due)+"."));
+      window.studyDisplayAnswer(feedback,fs,value,item.answer,item.why);
+      feedback.append(el("p","meta",(!right||unsure)?"Câu này đã vào danh sách cần ôn.":"Lần ôn tiếp theo · "+dateText(r.due)+"."));
       const seen=action("Đã đối chiếu lời giải",()=>{change(item.id,z=>{z.seen=Date.now()});seen.textContent="Đã ghi nhận";seen.disabled=true;refresh();});
       feedback.append(seen,action(at+1===queue.length?"Xem kết quả":"Câu tiếp theo",next,true));refresh();
-    },true);
-    main.append(fs,confidence,grade,feedback);
+    });
+    main.append(el("p","meta","Chọn đáp án để xem lời giải. Nếu còn phân vân, đánh dấu trước khi chọn."),confidence,fs,feedback);
   }
   function writeAnswer(main,item){
     let r=read(data.page,item.id);

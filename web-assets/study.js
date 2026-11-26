@@ -212,6 +212,40 @@
     dialog.showModal();
   });
 
+  function displayAnswer(box, fieldset, value, answer, explanation) {
+    const selected = String(value), correct = String(answer), right = selected === correct;
+    const radios = [...fieldset.querySelectorAll('input[type="radio"]')];
+    for (const radio of radios) {
+      const label = radio.closest("label");
+      label.classList.toggle("answer-option-correct", radio.value === correct);
+      label.classList.toggle("answer-option-incorrect", radio.value === selected && !right);
+      radio.disabled = radio.value !== selected;
+    }
+    const option = n => radios.find(r => r.value === n).closest("label").textContent.trim();
+    const verdict = document.createElement("strong");
+    verdict.className = "answer-verdict";
+    verdict.textContent = right ? "Đúng" : "Chưa đúng";
+    box.dataset.result = right ? "right" : "wrong";
+    box.replaceChildren(verdict);
+    if (!right) {
+      const picked = document.createElement("p");
+      picked.textContent = "Bạn chọn " + option(selected);
+      box.append(picked);
+    }
+    const key = document.createElement("p");
+    key.textContent = "Đáp án đúng · " + option(correct);
+    box.append(key);
+    if (typeof explanation === "string") {
+      const reason = document.createElement("p");
+      reason.className = "practice-prose";
+      reason.textContent = explanation;
+      box.append(reason);
+    } else {
+      box.append(explanation);
+    }
+  }
+  window.studyDisplayAnswer = displayAnswer;
+
   function setupStudyForm(form) {
     const fields = [...form.querySelectorAll('input[type="radio"][data-response]')];
     const essays = [...form.querySelectorAll("textarea[data-response]")];
@@ -314,7 +348,8 @@
           link.textContent = item.querySelector(".question-code").textContent;
           score.append(link, index === missed.length - 1 ? "." : ", ");
         });
-        form.parentElement.querySelector(".daily-key").open = missed.length > 0;
+        const answerSheet = form.querySelector(".daily-key") || form.parentElement.querySelector(".daily-key");
+        if (answerSheet) answerSheet.open = missed.length > 0;
       }
     });
     form.addEventListener("input", event => {
@@ -333,6 +368,18 @@
       }
       updateStatus();
     });
+    form.addEventListener("study:retry", event => {
+      const radio = event.target.querySelector('input[type="radio"]');
+      try {
+        const saved = JSON.parse(localStorage.getItem(key) || "{}") || {};
+        if (saved.choices) delete saved.choices[radio.name];
+        localStorage.setItem(key, JSON.stringify(saved));
+      } catch { storageAvailable = false; }
+      const groupScore = event.target.closest(".bank-group")?.querySelector(".group-score");
+      if (groupScore) groupScore.textContent = "";
+      if (score) score.textContent = "";
+      updateProgress(); updateStatus();
+    });
     function refresh() { restore(); updateProgress(); updateStatus(); }
     window.addEventListener("pageshow", event => { if (event.persisted) refresh(); });
     window.addEventListener("storage", event => { if (event.key === key) refresh(); });
@@ -342,6 +389,106 @@
   }
 
   document.querySelectorAll("form[data-study]").forEach(setupStudyForm);
+
+  const courseSlugs = ["sinh-hoc-te-bao", "vi-sinh-vat", "sinh-hoc-phan-tu-di-truyen"];
+  const course = document.body.dataset.studyCourse || location.pathname.split("/").find(part => courseSlugs.includes(part));
+  const currentPath = location.pathname.split("/" + course + "/")[1] || "";
+  const extraMemory = new Map();
+  const bookQuestions = [...document.querySelectorAll("fieldset[data-correct]")];
+  function extraKey(field) {
+    return field.dataset.extraCode && course ? "on-thi:bo-tro:1:" + course + ":" + field.dataset.extraCode : "";
+  }
+  function readExtra(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) return JSON.parse(raw) || {};
+    } catch {}
+    return extraMemory.get(key) || {};
+  }
+  function writeExtra(field, choice) {
+    const key = extraKey(field);
+    if (!key) return;
+    const record = readExtra(key);
+    record.choice = choice;
+    if (choice !== null) {
+      record.tries = (record.tries || 0) + 1;
+      record.last = record.shown = Date.now();
+      record.right = choice === field.dataset.correct;
+      record.label = field.querySelector("legend").textContent.trim();
+      record.path = currentPath ? currentPath + "#" + field.id : "";
+    }
+    extraMemory.set(key, record);
+    try { localStorage.setItem(key, JSON.stringify(record)); } catch {}
+    window.dispatchEvent(new Event("study:progress"));
+  }
+  function clearAnswer(field) {
+    field.querySelector(":scope > .answer-feedback")?.remove();
+    delete field.dataset.gradedChoice;
+    for (const radio of field.querySelectorAll('input[type="radio"]')) {
+      radio.disabled = false;
+      radio.closest("label").classList.remove("answer-option-correct", "answer-option-incorrect");
+    }
+  }
+  function showBookAnswer(field, fresh) {
+    const radio = field.querySelector('input[type="radio"]:checked');
+    if (!radio) { clearAnswer(field); return; }
+    if (field.dataset.gradedChoice === radio.value) return;
+    const template = field.querySelector("template[data-explanation]");
+    const original = document.getElementById("giai-" + field.id);
+    if (!template && !original) return;
+    const reason = document.createDocumentFragment();
+    if (template) reason.append(template.content.cloneNode(true));
+    else for (const node of original.children) {
+      if (node.matches("p:not(.group-study-notes), .quant-solution, .formula-card")) reason.append(node.cloneNode(true));
+    }
+    let box = field.querySelector(":scope > .answer-feedback");
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "answer-feedback";
+      box.setAttribute("aria-live", "polite");
+      field.append(box);
+    }
+    displayAnswer(box, field, radio.value, field.dataset.correct, reason);
+    field.dataset.gradedChoice = radio.value;
+    const retry = document.createElement("button");
+    retry.type = "button"; retry.className = "button secondary"; retry.textContent = "Thử lại câu này";
+    retry.addEventListener("click", () => {
+      radio.checked = false;
+      clearAnswer(field);
+      writeExtra(field, null);
+      field.dispatchEvent(new Event("study:retry", {bubbles:true}));
+      field.querySelector('input[type="radio"]').focus();
+    });
+    box.append(retry);
+    if (fresh) {
+      writeExtra(field, radio.value);
+      field.dispatchEvent(new CustomEvent("study:answered", {bubbles:true, detail:Number(radio.value)}));
+    }
+  }
+  function restoreBookAnswers() {
+    for (const field of bookQuestions) {
+      const key = extraKey(field);
+      if (key) {
+        // Aliases in a combined worksheet do not share an HTML id, only a saved question.
+        if (!field.id) field.id = "them-" + field.dataset.extraCode + "-" + field.querySelector("input").name;
+        const prior = readExtra(key);
+        if (Object.hasOwn(prior, "choice")) {
+          for (const radio of field.querySelectorAll('input[type="radio"]')) radio.checked = radio.value === prior.choice;
+        }
+      }
+      showBookAnswer(field, false);
+    }
+  }
+  document.addEventListener("change", event => {
+    const radio = event.target.closest('input[type="radio"]');
+    const field = radio?.closest("fieldset[data-correct]");
+    if (field) showBookAnswer(field, true);
+  });
+  restoreBookAnswers();
+  window.addEventListener("pageshow", event => { if (event.persisted) restoreBookAnswers(); });
+  window.addEventListener("storage", event => {
+    if (!event.key || event.key.startsWith("on-thi-21-ngay:v1:") || event.key.startsWith("on-thi:bo-tro:1:")) restoreBookAnswers();
+  });
 })();
 
 

@@ -818,3 +818,56 @@ a.term-link:hover,a.term-link:focus-visible {color:var(--accent);text-decoration
 .term-card:focus-visible {outline:2px solid var(--accent);outline-offset:2px}
 
 @media print {.print-meanings dt::after {content:" · ";font-weight:400}}
+
+/* A small diagram sits beside the definition and travels with the printable notebook. */
+.term-figure {margin:.55rem 0 .7rem;padding:.6rem .65rem;background:var(--tint);border-inline-start:2px solid var(--accent);border-radius:.2rem;color:var(--ink);min-width:0}
+.term-figure .term-drawing {display:block;width:100%;max-width:16rem;height:auto;max-height:4.1rem;margin:0 auto .5rem;color:var(--accent)}
+.term-fill {fill:#ebc7ac}
+.term-figure figcaption {color:var(--ink);font-family:var(--body-face);font-size:.88em;line-height:1.45;margin:.45em 0 0}
+.term-nodes {display:flex;flex-direction:column;gap:.25em;list-style:none!important;padding:0!important;margin:0!important}
+.term-nodes>li {position:relative;margin:0!important;padding:.16em .38em .16em .7em;font-size:.88em;line-height:1.35;font-weight:600;overflow-wrap:anywhere;color:var(--ink);border-inline-start:2px solid #a46848}
+.term-fig-path .term-nodes,.term-fig-cycle .term-nodes {padding-left:.25rem!important}
+.term-fig-path li,.term-fig-cycle li {border:0;padding:.1em 0 .1em 1.12em}
+.term-fig-path li:not(:last-child)::before,.term-fig-cycle li:not(:last-child)::before {position:absolute;left:.23em;top:.88em;bottom:-.65em;content:"";width:1px;background:#a46848}
+.term-fig-path li::after,.term-fig-cycle li::after {content:"";position:absolute;left:0;top:.49em;width:.46em;height:.46em;border-radius:50%;background:var(--accent)}
+.term-fig-cycle .term-nodes {border-inline-end:1px dashed #9c684b;padding-right:.55em!important;border-radius:0 10px 10px 0}
+.term-fig-branch li:first-child {border:0;padding-left:0}
+.term-fig-branch li:not(:first-child) {margin-inline-start:.65em!important;border:0;border-inline-start:1px solid #a46848}
+.term-fig-branch li:not(:first-child)::before {content:"";position:absolute;left:0;top:.75em;width:.4em;border-top:1px solid #a46848}
+.term-fig-compare .term-nodes {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.34em}
+.term-fig-compare li,.term-fig-parts li {border:1px solid #d3b6a0;border-radius:.18em;background:var(--paper);padding:.32em .45em}
+.term-fig-parts .term-nodes {display:flex;flex-flow:row wrap;gap:.32em}
+.term-fig-position li {border-inline-start:3px solid #ae7859}
+.term-fig-scale li {border:0;border-bottom:1px solid #bd9277;padding:.2em 0 .2em .4em}
+.notebook-terms {display:flex;flex-wrap:wrap;align-items:start;gap:.35rem;margin:.5rem 0 .65rem}
+.notebook-term {min-width:0;font-size:.94em}
+.notebook-term summary {color:var(--accent);cursor:pointer;padding:.2em .5em;border:1px solid var(--line);border-radius:.25rem;font-weight:600}
+.notebook-term[open] {flex:1 1 100%;max-width:35rem}
+.notebook-term[open] summary {width:fit-content;background:var(--tint)}
+.notebook-term[open]>.term-figure {max-width:24rem}
+.term-figure,.term-drawing,.term-nodes {box-sizing:border-box}
+.answer-feedback:not(:empty) {padding:.65rem .85rem;margin:.45rem 0 .75rem;border-inline-start:3px solid var(--accent);background:var(--tint);line-height:1.5}
+.answer-feedback p,.practice-feedback p {margin:.32em 0}
+.answer-verdict {font-weight:700}
+.answer-option-correct {outline:1px solid #61725b;outline-offset:-1px;background:#f1f3e9}
+.answer-option-incorrect {outline:1px dashed #9a573b;outline-offset:-1px;background:#f9e8dc}
+@media print {
+  .print-term-glossary {margin-top:1em}
+  .print-term-card {break-inside:avoid;padding:.5em 0;border-bottom:.6pt solid var(--line)}
+  .print-term-card h4,.print-term-card p {margin:.15em 0}
+  .print-term-card .term-figure {margin:.22em 0;padding:.3em .55em}
+  .print-term-card .term-nodes {display:flex;flex-flow:row wrap;gap:.25em .75em}
+  .print-term-card .term-nodes>li {font-size:.9em;padding:.1em .35em;font-weight:650;background:transparent;border:0;border-bottom:.5pt solid var(--line);margin:0!important}
+  .print-term-card :is(.term-fig-path,.term-fig-cycle) li:not(:last-child)::after {content:"→";position:static;display:inline;margin-left:.55em;background:none;color:var(--accent)}
+  .print-term-card .term-nodes li::before,.print-term-card .term-nodes li:last-child::after {display:none}
+  .print-term-card .term-fig-cycle .term-nodes {border:0}
+  .print-term-card .term-drawing {max-width:12em;margin:.15em 0 .3em}
+  .print-term-card figcaption {font-size:.9em}
+}
+
+.mini-answer-history{margin:.5rem 0;padding:.45rem .65rem;border-inline-start:2px solid var(--line)}
+.mini-answer-history summary{cursor:pointer;color:var(--accent)}
+
+.term-card[data-key="locus"] .term-nodes,.term-card[data-key="cpg"] .term-nodes {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.25em}
+.term-card[data-key="locus"] .term-nodes>li,.term-card[data-key="cpg"] .term-nodes>li {text-align:center;padding:.22em .1em;border:0;border-top:1px solid var(--line)}
+.term-card[data-key="locus"] .term-nodes>li:nth-child(2),.term-card[data-key="cpg"] .term-nodes>li:nth-child(2) {color:var(--accent);border-top:2px solid var(--accent)}

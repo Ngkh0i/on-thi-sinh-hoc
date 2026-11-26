@@ -1,0 +1,51 @@
+.progress-view { max-width: 76rem; }
+.progress-view > section { margin-block: 1.8rem; }
+.progress-view h2 { margin-block: 1.5rem .65rem; }
+.progress-view h3 { margin: 0 0 .55rem; font-size: 1.15rem; }
+.progress-view p { margin: .45rem 0; }
+.progress-view .meta { max-width: 78ch; }
+.progress-meter-grid, [data-progress-courses], .progress-metrics {
+  display: grid;
+  gap: .8rem 1.5rem;
+}
+.progress-meter-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.progress-meter { margin-block: .4rem; }
+.progress-meter > div { display: flex; justify-content: space-between; align-items: baseline; gap: .75rem; }
+.progress-meter b { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.progress-meter progress { display:block; width:100%; height:.55rem; margin-block:.3rem; accent-color:var(--accent); }
+.progress-metrics {
+  margin-block: 1.1rem .5rem;
+  border-block: 1px solid var(--line);
+  padding-block: .6rem;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+}
+.progress-metrics strong { font: bold 1.65rem/1.3 var(--heading-face); color: var(--accent); display: block; font-variant-numeric: tabular-nums; }
+.progress-metrics span { color: var(--muted); font-size: .93rem; }
+.progress-footnotes { padding-inline-start: 1.25rem; }
+.progress-filters, .progress-links { display: flex; flex-wrap: wrap; gap: .45rem 1.1rem; align-items:center; }
+.progress-filters label { display:flex; gap:.45rem; flex-wrap:wrap; align-items:center; }
+.progress-filters select {
+  padding:.45rem .55rem; border-radius:.25rem; border:1px solid var(--accent); color:var(--ink);
+  background:var(--paper); font-size:1rem; max-width:100%;
+}
+.progress-next { border-inline-start: .22rem solid var(--accent); background:var(--tint); padding:.6rem 1rem; }
+.progress-next > a { display:block; width:fit-content; }
+[data-progress-courses] { grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:1.4rem; }
+.progress-course,.progress-row { border-block-start: 1px solid var(--line); padding-block: .95rem; }
+.progress-row { max-width:73ch; }
+.progress-row .progress-meter { max-width:38rem; }
+.progress-units summary { padding-block:.35rem; cursor:pointer; color:var(--accent); font-weight:600; }
+.progress-units ul { list-style:none; margin:0; padding:0 0 0 .8rem; border-inline-start:1px solid var(--line); }
+.progress-units li { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem 1.4rem; padding:.5rem 0; }
+.progress-units li + li { border-top:1px solid var(--line); }
+.progress-units li .meta { margin:.15rem 0 0; }
+.progress-view :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+@media (max-width: 48rem) {
+  [data-progress-courses],.progress-meter-grid { grid-template-columns:1fr; }
+  [data-progress-courses] { gap:0; }
+  .progress-filters { align-items:flex-start; }
+  .progress-filters label,.progress-units li { display:block; }
+  .progress-filters select { display:block; }
+  .progress-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media print { .progress-view, [data-subject-progress] { display:none; } }
