@@ -137,6 +137,8 @@
       const area=text.closest("[data-mini-unit]");
       const start=area.querySelector("[data-path-mini]");
       if(start){
+        const loop=area.querySelector("[data-loop]"), saved=read(data.page,"loop:"+text.dataset.miniStatus);
+        if(loop)loop.textContent=saved.done?"Ôn đến hết lần nữa":saved.pending?.length?"Tiếp tục ôn đến hết · lượt "+saved.round:"Ôn đến khi hết";
         const state=pathState(set), pos=state.at||0;
         start.textContent=pos===set.length?"Làm lại 13 câu":pos>0?"Tiếp tục từ câu "+(pos+1)+"/13":"Làm 13 câu";
         const due=set.filter(dueItem).length, retry=area.querySelector("[data-retry-mini]");
@@ -167,11 +169,13 @@
   }
   function recordMC(item,choice,unsure,independent,context={}){
     const prior=read(data.page,item.id);
+    if(context.loop && prior.lastLoop===context.loop)return prior;
     if(context.exam && prior.lastExamAttempt===context.exam)return prior;
     const result=change(item.id,r=>{
       const now=Date.now(), right=choice===item.answer;
       const needsRecall=r.right===false || r.unsure;
       if(!independent && !context.fresh && r.lastBook===choice)return;
+      if(context.loop)r.lastLoop=context.loop;
       if(context.exam)r.lastExamAttempt=context.exam;
       if(!independent)r.lastBook=choice;
       r.lastChoice=choice;r.shown=now;
@@ -222,7 +226,7 @@
   }
   function begin(list,mode,cap=5) {
     if(!list.length){notice.textContent="Chưa có câu cần ôn ở mục này. Bạn có thể chọn “Luyện 5 câu” để học tiếp.";return;}
-    queue=["exam","history","path"].includes(mode)?list.slice():mix(list).sort((a,b)=>priority(a)-priority(b)).slice(0,cap);
+    queue=["exam","history","path","loop"].includes(mode)?list.slice():mix(list).sort((a,b)=>priority(a)-priority(b)).slice(0,cap);
     at=0;misses=[];rightCount=0;sessionType=mode;
     if(mode==="path"){
       const saved=pathState(list);
@@ -243,7 +247,7 @@
   }
   function shell(heading,kicker) {
     dialog.replaceChildren();
-    const top=el("div","practice-top");top.append(el("span","meta",kicker),action("Đóng",()=>dialog.close()));
+    const top=el("div","practice-top");top.append(el("span","meta",kicker),action(sessionType==="loop"?"Dừng và lưu":"Đóng",()=>dialog.close()));
     const h=el("h2","",heading);h.id="practice-title";h.tabIndex=-1;
     dialog.append(top,h);
     const main=el("div","practice-body");dialog.append(main);dialog.scrollTop=0;h.focus();return main;
@@ -273,6 +277,7 @@
   }
   function next(){at++;display();}
   function display(){
+    if(sessionType==="loop"){loopScreen();return;}
     if(sessionType==="exam"){examQuestion();return;}
     if(at>=queue.length){
       const main=shell("Kết quả lượt ôn",data.title);
@@ -286,8 +291,81 @@
     if(sessionType==="path")main.append(el("p","meta",at<10?"Tự kiểm kiến thức · câu "+(at+1)+" trong 10 câu":"Nối kiến thức · câu "+(at-9)+" trong 3 câu"));
     scene(main,item);
     const question=el("p","practice-question",item.q);main.append(question);
-    if(written)writeAnswer(main,item);else chooseAnswer(main,item);
+    if(written)writeAnswer(main,item);else {showHint(main,item);chooseAnswer(main,item);}
   }
+  function startLoop(list) {
+    const id = "loop:" + list[0].part;
+    const ids = list.map(i => i.id), signature = ids.join(".");
+    const saved = read(data.page,id);
+    if (saved.signature !== signature || saved.done) {
+      change(id,s => Object.assign(s,{signature,round:1,pending:ids,again:[],choice:null,order:null,flag:false,done:false,run:Date.now()}));
+    }
+    begin(list,"loop",list.length);
+  }
+  function loopScreen() {
+    const id = "loop:" + queue[0].part, s = read(data.page,id);
+    if (s.done) {
+      const main = shell("Đã giải quyết hết "+queue.length+" câu trong buổi này", data.title);
+      main.append(el("p","meta","Hoàn thành sau "+s.round+" lượt. Mốc nhớ lại sau 24 giờ được ghi riêng."),action("Về bài học",()=>dialog.close()));
+      return;
+    }
+    const item=queue.find(q=>q.id===s.pending[0]);
+    const remaining=s.pending.length+s.again.length;
+    const main=shell("Ôn đến khi hết", "Lượt "+s.round+" · Còn "+remaining+" câu");
+    main.append(meter("Đã giải quyết trong buổi",queue.length-remaining,queue.length));
+    scene(main,item); main.append(el("p","practice-question",item.q)); showHint(main,item);
+    const fs=el("fieldset","review-options");fs.append(el("legend","sr-practice","Chọn đáp án"));
+    const flag=el("input");flag.type="checkbox";flag.checked=s.flag;
+    const label=el("label","practice-confidence");label.append(flag,document.createTextNode(" Muốn làm lại ở lượt sau"));
+    flag.onchange=()=>change(id,x=>{if(x.run===s.run && x.round===s.round && x.pending[0]===item.id)x.flag=flag.checked;});
+    const feedback=el("div","practice-feedback");feedback.setAttribute("aria-live","polite");
+    function reveal(n) {
+      recordMC(item,n,false,true,{loop:s.run+":"+s.round+":"+item.id});
+      window.studyDisplayAnswer(feedback,fs,n,item.answer,item.why);
+      explainChoice(feedback,item,n);
+      feedback.append(action("Tiếp tục",()=>{
+        change(id,x=>{
+          if(x.run!==s.run || x.pending[0]!==item.id || x.round!==s.round)return;
+          x.pending.shift();
+          if(n!==item.answer || x.flag)x.again.push(item.id);
+          x.flag=false;x.choice=null;x.order=null;
+          if(!x.pending.length){
+            if(x.again.length){x.pending=mix(x.again);x.again=[];x.round++;}
+            else x.done=true;
+          }
+        });
+        loopScreen();refresh();
+      },true));
+    }
+    const order=s.order || mix(item.options.map((_,i)=>i));
+    if(!s.order)change(id,x=>{x.order=order;});
+    order.forEach((n,pos)=>{
+      const opt=item.options[n];
+      const choice=el("input");choice.type="radio";choice.name="loop-answer";choice.value=n;choice.checked=s.choice===n;
+      const row=el("label","review-option");row.append(choice,el("span","","ABCD"[pos]+". "+opt));fs.append(row);
+      choice.onchange=()=>{
+        const latest=read(data.page,id);
+        if(latest.run!==s.run || latest.round!==s.round || latest.pending[0]!==item.id || Number.isInteger(latest.choice)){loopScreen();return;}
+        change(id,x=>{x.choice=n;});
+        reveal(n);refresh();
+      };
+    });
+    main.append(fs,label,feedback);
+    if(Number.isInteger(s.choice))reveal(s.choice);
+  }
+  function showHint(main,item){
+    const guide=data.guides?.[item.part];if(!guide)return;
+    const info=el("details","genetics-theory");info.append(el("summary","",guide.items?.[item.id]?"Gợi ý cho câu này":"Gợi ý nền của tiểu mục"));
+    info.append(el("p","",guide.items?.[item.id]?.hint || guide.hint),el("p","",guide.read));
+    const figure=document.getElementById(item.part+"-hinh-on");if(figure)for(const child of figure.children)info.append(child.cloneNode(true));
+    main.append(info);
+  }
+  function explainChoice(box,item,n){
+    const guide=data.guides?.[item.part];if(!guide || n===item.answer)return;
+    const reason=guide.items?.[item.id]?.wrong?.[n];
+    box.append(el("p","practice-prose",reason || ("Đối chiếu kiến thức của tiểu mục · "+guide.reason)));
+  }
+
   function launchExam(){
     const paper=items.filter(i=>i.type==="mc");
     const signature=paper.map(i=>i.id).join(".");
@@ -376,6 +454,7 @@
       if(right&&!unsure)rightCount++;else misses.push(item);
       savePath(at+1);
       window.studyDisplayAnswer(feedback,fs,value,item.answer,item.why);
+      explainChoice(feedback,item,value);
       feedback.append(el("p","meta",(!right||unsure)?"Câu này đã vào danh sách cần ôn.":"Lần ôn tiếp theo · "+dateText(r.due)+"."));
       const seen=action("Đã đối chiếu lời giải",()=>{change(item.id,z=>{z.seen=Date.now()});seen.textContent="Đã ghi nhận";seen.disabled=true;refresh();});
       feedback.append(seen,action(at+1===queue.length?"Xem kết quả":"Câu tiếp theo",next,true));refresh();
@@ -412,9 +491,10 @@
     main.append(input,el("p","meta","Bản nháp được lưu khi gõ. Bài mẫu mở sau khi bạn viết câu trả lời."),reveal,feedback);
   }
   document.addEventListener("click",event=>{
-    const button=event.target.closest("[data-run],[data-path-mini],[data-retry-mini],[data-start-mini],[data-start-recall],[data-write-item],[data-repeat-group]");
+    const button=event.target.closest("[data-loop],[data-run],[data-path-mini],[data-retry-mini],[data-start-mini],[data-start-recall],[data-write-item],[data-repeat-group]");
     if(!button)return;
     notice.textContent="";
+    if(button.dataset.loop){startLoop(units.get(button.dataset.loop).filter(i=>i.type==="mini"));return;}
     if(button.dataset.run==="exam"){launchExam();return;}
     if(button.dataset.repeatGroup){const group=document.getElementById(button.dataset.repeatGroup);const set=[...group.querySelectorAll("fieldset[id]")].map(f=>byAnchor.get(f.id)).filter(Boolean);begin(set,"mc",set.length);return;}
     if(button.dataset.pathMini || button.dataset.retryMini){

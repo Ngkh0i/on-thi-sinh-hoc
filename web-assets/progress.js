@@ -9,9 +9,9 @@
       let button = null;
       if (request === "exam" || request === "essay-due") {
         button = document.querySelector('[data-run="' + request + '"]');
-      } else if (request === "mini" || request === "mini-due") {
+      } else if (request === "loop" || request === "mini" || request === "mini-due") {
         const section = document.getElementById(location.hash.slice(1));
-        button = section?.querySelector(request === "mini" ? "[data-path-mini]" : "[data-retry-mini]");
+        button = section?.querySelector(request === "loop" ? "[data-loop]" : request === "mini" ? "[data-path-mini]" : "[data-retry-mini]");
       }
       if (button && !button.disabled) button.click();
     }, { once: true });
@@ -109,7 +109,8 @@
       combine(stats,result);
       const path = record("mini-path:"+unit.anchor);
       const position = path.signature===unit.questions.join(".") && Number.isInteger(path.at) ? path.at : 0;
-      return {unit, stats:result, position};
+      const loop = record("loop:"+unit.anchor);
+      return {unit, stats:result, position, round:loop.signature===unit.questions.join(".") && !loop.done ? loop.round : 0};
     });
     for (const id of page.bonus) check(id,stats);
     for (const [id, field] of page.essays) {
@@ -126,7 +127,7 @@
     stats.read=Math.min(units.length, Math.max(0,Number(snap.records.get(notebookKey+page.page))||0));
     stats.unitTotal=units.length;
     recent=Math.max(recent,exam.lastDate || 0);
-    const started=!!(stats.done || stats.read || stats.written || stats.essayDrafts || stats.drafts || examChoices || exam.lastDate || units.some(u => u.position));
+    const started=!!(stats.done || stats.read || stats.written || stats.essayDrafts || stats.drafts || examChoices || exam.lastDate || units.some(u => u.position || u.round));
     return {page,stats,units,exam,examChoices,recent,started};
   }
   function courseState(course,snap) {
@@ -239,13 +240,14 @@
       details.dataset.page=page.page;
       details.append(el("summary","Tiến độ "+units.length+" tiểu mục"));
       const ul=el("ul");
-      units.forEach(({unit,stats:s,position})=>{
+      units.forEach(({unit,stats:s,position,round})=>{
         const li=el("li"), detail=el("div");
         const route=page.url+"#"+unit.anchor+"-trac-nghiem";
         detail.append(anchor(route,unit.title),el("p",s.done+"/"+s.total+" đã làm · "+s.right+" đúng · "+s.wrong+" sai","meta"));
         const controls=el("div",null,"progress-links");
         const resume=position>0 && position<unit.questions.length;
         addLink(controls,page.url+"?reprendre=mini#"+unit.anchor+"-trac-nghiem",resume?"Tiếp từ câu "+(position+1):s.done?"Làm lại":"Làm "+s.total+" câu");
+        if (round) addLink(controls,page.url+"?reprendre=loop#"+unit.anchor+"-trac-nghiem","Tiếp tục ôn đến hết · lượt "+round);
         if (s.due) addLink(controls,page.url+"?reprendre=mini-due#"+unit.anchor+"-trac-nghiem","Ôn "+s.due+" câu đến hẹn");
         li.append(detail,controls);ul.append(li);
       });
