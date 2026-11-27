@@ -886,3 +886,17 @@ a.term-link:hover,a.term-link:focus-visible {color:var(--accent);text-decoration
 .foundation-chips a { display:inline-block; padding:.22em .55em; color:var(--accent); text-decoration:none; border:1px solid var(--line); border-radius:.22rem; }
 .foundation-chips a:focus-visible,.foundation-chips a:hover { border-color:var(--accent); text-decoration:underline; }
 @media print { .foundation-word { color:inherit; } }
+
+.english-note{color:#704930;font-family:var(--body-face,inherit);font-size:.91em;font-weight:400;overflow-wrap:break-word}
+.reader-font.vocab-control{display:flex;align-items:center;gap:.48rem}
+.vocab-control input{accent-color:#86401f}
+.vocab-index{margin:1.1rem 0;padding:.7rem 1rem;border:1px solid var(--line,#d7b79e);border-radius:.35rem}
+.vocab-index summary{cursor:pointer;font-weight:650}
+.vocab-index label{display:block;margin:1rem 0 .3rem}
+.vocab-index input{font:inherit;max-width:100%;padding:.35rem .5rem}
+.vocab-index ul{list-style:none;padding:0;max-height:65vh;overflow:auto}
+.vocab-index li{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.75rem;padding:.35rem .2rem;border-top:1px solid #dbc1ac;overflow-wrap:anywhere}
+.vocab-index li[hidden]{display:none}
+.vocab-index li span[lang=en]{color:#704930}
+@media screen{.reading-vi-only .english-note{display:none}}
+@media print{.english-note{color:#4f4237}}

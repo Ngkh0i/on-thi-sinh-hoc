@@ -536,7 +536,7 @@
       const b = document.createElement("button");
       b.type = "button";
       b.dataset.key = key;
-      b.textContent = cards.get(key).querySelector("h3").textContent;
+      b.replaceChildren(...Array.from(cards.get(key).querySelector("h3").childNodes, node => node.cloneNode(true)));
       nearby.append(b);
     }
     if (keys.length) show(keys[0]);
@@ -634,4 +634,39 @@
   refresh();
   const target = document.getElementById(location.hash.slice(1));
   if (target?.classList.contains("term-card")) open(target.dataset.key, shortcut);
+})();
+
+
+(() => {
+  const toggle = document.querySelector("[data-english-toggle]");
+  if (toggle) {
+    const preference = "on-thi:tu-vung:hien-tieng-anh";
+    try { toggle.checked = localStorage.getItem(preference) !== "off"; } catch {}
+    const apply = () => document.documentElement.classList.toggle("reading-vi-only", !toggle.checked);
+    apply();
+    toggle.addEventListener("change", () => {
+      apply();
+      try { localStorage.setItem(preference, toggle.checked ? "on" : "off"); } catch {}
+    });
+  }
+  const index = document.querySelector(".vocab-index");
+  if (!index) return;
+  const field = index.querySelector("[data-vocab-search]");
+  const count = index.querySelector("[data-vocab-count]");
+  const fold = value => value.toLocaleLowerCase("vi").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+  const rows = Array.from(index.querySelectorAll("li"), item => [item,fold(item.textContent)]);
+  function filter() {
+    const words = fold(field.value.trim()).split(/\s+/);
+    let shown = 0;
+    for (const [item,text] of rows) {
+      item.hidden = !words.every(word => text.includes(word));
+      if (!item.hidden) shown++;
+    }
+    count.textContent = shown ? shown + " mục từ" : "Chưa thấy mục từ. Hãy thử một từ ngắn hơn.";
+  }
+  function openFromLink() { if (location.hash === "#tu-vung") index.open = true; }
+  openFromLink();
+  window.addEventListener("hashchange",openFromLink);
+  field.addEventListener("input",filter);
+  filter();
 })();
